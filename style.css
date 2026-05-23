@@ -1,0 +1,151 @@
+:root {
+  /* ───────── Frosted Mint ───────── */
+
+  --light-frosted-mint: #edf9f0ff; /*Surface/light*/
+  --frosted-mint: #d4f2dbff; /*Surface/background*/
+  --light-dark-frosted-mint: #b8e0b1ff; /*Surface/hover*/
+  --medium-dark-frosted-mint: #9cd089ff; /*Surface/active*/
+  --dark-frosted-mint: #7bbf6fff; /*Surface/pressed*/
+
+  /* ───────── Lime Cream ───────── */
+
+  --light-lime-cream: #e5fccaff; /*Accent/light*/
+  --lime-cream: #cef7a0ff; /*Accent/highlight*/
+  --light-dark-lime-cream: #b6eb7cff; /*Accent/hover*/
+  --medium-dark-lime-cream: #9bdd5cff; /*Accent/active*/
+  --dark-lime-cream: #7fc042ff; /*Accent/pressed*/
+
+  /* ───────── Rosy Taupe ───────── */
+
+  --light-rosy-taupe: #d8c1bcff; /*Muted/light*/
+  --rosy-taupe: #ba9790ff; /*Muted/support*/
+  --light-dark-rosy-taupe: #a9827aff; /*Muted/hover*/
+  --medium-dark-rosy-taupe: #966c64ff; /*Muted/active*/
+  --dark-rosy-taupe: #7d5650ff; /*Muted/pressed*/
+
+  /* ───────── Berry Blush ───────── */
+
+  --light-berry-blush: #b6789dff; /*Primary/light*/
+  --berry-blush: #914d76ff; /*Primary/brand*/
+  --light-dark-berry-blush: #7d4065ff; /*Primary/hover*/
+  --medium-dark-berry-blush: #693454ff; /*Primary/active*/
+  --dark-berry-blush: #542843ff; /*Primary/pressed*/
+
+  /* ───────── Wine Plum ───────── */
+
+  --light-wine-plum: #87505bff; /*Dark/light*/
+  --wine-plum: #69353fff; /*Dark/base*/
+  --light-dark-wine-plum: #592c35ff; /*Dark/hover*/
+  --medium-dark-wine-plum: #49242bff; /*Dark/active*/
+  --dark-wine-plum: #391b21ff; /*Dark/pressed*/
+
+  --thin-weight: 100;
+  --light-weight: 300;
+  --regular-weight: 400;
+  --medium-weight: 500;
+  --bold-weight: 700;
+  --black-weight: 900;
+
+  --extra-small-font-size: 0.75em;
+  --small-font-size: 0.875em;
+  --medium-font-size: 1em;
+  --large-font-size: 1.25em;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  color: var(--wine-plum);
+  font-family: Helvetica, Arial, sans-serif, "Times New Roman", Times, serif;
+}
+nav {
+  padding: 1em;
+  background-color: var(--berry-blush);
+  display: flex;
+  justify-content: space-around;
+  div {
+    border: 1px solid var(--wine-plum);
+    padding: 0.5em 1em;
+    border-radius: 5px;
+    background-color: var(--frosted-mint);
+    transition:
+      transform 0.4s ease-in-out,
+      background-color 0.4s ease-in-out,
+      box-shadow 0.4s ease-in-out;
+    &:hover {
+      background-color: var(--lime-cream);
+      transform: scale(1.1) translate(5px, -5px);
+      box-shadow:
+        -2px 2px 0 var(--light-dark-frosted-mint),
+        -4px 4px 0 var(--medium-dark-frosted-mint),
+        -6px 6px 0 var(--dark-frosted-mint);
+    }
+
+    a {
+      text-decoration: none;
+      color: black;
+      font-size: 1.2em;
+      font-weight: var(--light-weight);
+    }
+  }
+}
+main {
+  padding: 2em;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+.circle-image-split {
+  --size: 500px;
+  width: var(--size);
+  height: var(--size);
+
+  /* border-radius: 999px; */
+  /* overflow: hidden; */
+
+  display: flex;
+
+  border: 3px solid var(--wine-plum);
+  border-radius: 0 20px 20px 0;
+  overflow: hidden;
+
+  div {
+    width: 50%;
+    height: 100%;
+  }
+
+  div:nth-child(1) {
+    /* overflow: hidden; */
+    width: 50%;
+    height: 100%;
+
+    overflow: hidden;
+    position: relative;
+    border-radius: 100% 0 0 100%;
+    img {
+      width: 200%;
+      height: 100%;
+      object-fit: cover;
+      transform: translateX(0%);
+      transition: transform 0.4s ease-in-out;
+    }
+  }
+
+  div:nth-child(2) {
+    background-color: var(--light-rosy-taupe);
+
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+
+    font-size: 1.5em;
+    font-weight: var(--bold-weight);
+    color: var(--wine-plum);
+    h1 {
+      font-weight: var(--black-weight);
+      font-size: var(--small-font-size);
+    }
+  }
+}

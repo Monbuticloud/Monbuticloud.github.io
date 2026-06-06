@@ -117,6 +117,14 @@ main {
   display: flex;
   justify-content: center;
   align-items: center;
+  flex-direction: column;
+}
+#name-section {
+  padding: 13em 0 10em 0;
+  h1 {
+    font-size: 4em;
+    font-weight: var(--bold-weight);
+  }
 }
 .image-split {
   width: 100%;
@@ -166,9 +174,5 @@ main {
     font-size: 1.5em;
     font-weight: var(--bold-weight);
     color: var(--wine-plum);
-    h1 {
-      font-weight: var(--black-weight);
-      font-size: var(--large-font-size);
-    }
   }
 }

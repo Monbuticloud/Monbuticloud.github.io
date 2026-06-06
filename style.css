@@ -52,26 +52,13 @@
   --large-font-size: 1.25em;
 }
 body {
-  background: linear-gradient(135deg, #7bbf6f, #542843);
+  background: var(--frosted-mint);
 }
 .glass {
-  position: relative;
-  background: transparent;
-}
-.glass::before {
-  content: "";
-  position: absolute;
-
-  inset: 0;
-
   background: rgba(255, 255, 255, 0.08);
-
   backdrop-filter: blur(24px) saturate(180%);
   -webkit-backdrop-filter: blur(24px) saturate(180%);
-
-  border: 1px solid rgba(255, 255, 255, 0.15);
-
-  z-index: 0;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.25);
 }
 
 .glass > * {
@@ -97,22 +84,18 @@ nav {
   justify-content: space-around;
   padding: 1em;
 
-  /* Glass effect directly on nav (no pseudo-element — avoids WebKit blur bleeding into children) */
-  background: rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(24px) saturate(180%);
-  -webkit-backdrop-filter: blur(24px) saturate(180%);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
-
   div {
     isolation: isolate; /* prevent backdrop-filter blur from bleeding into button content */
     border: 1px solid var(--wine-plum);
     padding: 0.5em 1em;
     border-radius: 5px;
     background-color: var(--frosted-mint);
+    /* Keep base anchored so scale doesn't drift bottom-left */
+    transform-origin: bottom left;
     transition:
-      transform 0.4s ease-in-out,
-      background-color 0.4s ease-in-out,
-      box-shadow 0.4s ease-in-out;
+      transform 0.3s cubic-bezier(0.25, 0.1, 0.25, 1),
+      background-color 0.3s cubic-bezier(0.25, 0.1, 0.25, 1),
+      box-shadow 0.3s cubic-bezier(0.25, 0.1, 0.25, 1);
     &:hover {
       background-color: var(--lime-cream);
       transform: scale(1.1) translate(5px, -5px);
@@ -124,7 +107,7 @@ nav {
 
     a {
       text-decoration: none;
-      color: black;
+      color: var(--wine-plum);
       font-size: 1.2em;
       font-weight: var(--light-weight);
     }

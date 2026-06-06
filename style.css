@@ -60,11 +60,24 @@
   font-family: Helvetica, Arial, sans-serif, "Times New Roman", Times, serif;
 }
 nav {
-  padding: 1em;
-  background-color: var(--berry-blush);
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+
   display: flex;
   justify-content: space-around;
+  padding: 1em;
+
+  /* Glass effect directly on nav (no pseudo-element — avoids WebKit blur bleeding into children) */
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+
   div {
+    isolation: isolate; /* prevent backdrop-filter blur from bleeding into button content */
     border: 1px solid var(--wine-plum);
     padding: 0.5em 1em;
     border-radius: 5px;

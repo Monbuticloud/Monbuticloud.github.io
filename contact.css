@@ -1,0 +1,70 @@
+/* ───────── Contact Section ───────── */
+#contact {
+  padding: 6em 1.5em 3em;
+  max-width: 700px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+#contact h2 {
+  font-size: 2em;
+  font-weight: var(--bold-weight);
+  text-align: center;
+  margin-bottom: 1em;
+}
+
+.contact-subtitle {
+  text-align: center;
+  color: var(--medium-dark-rosy-taupe);
+  margin-bottom: 2em;
+}
+
+.contact-list {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1em;
+}
+
+.contact-card {
+  background: rgba(255, 255, 255, 0.45);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 3px;
+  padding: 1.5em;
+  text-align: center;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.contact-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+}
+
+.contact-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5em;
+  margin-bottom: 0.5em;
+}
+
+.contact-card-name {
+  font-weight: var(--bold-weight);
+  font-size: 1em;
+  color: var(--wine-plum);
+}
+
+.contact-link {
+  font-size: 0.9em;
+  color: var(--berry-blush);
+  text-decoration: none;
+  margin-top: 0.5em;
+  display: inline-block;
+}
+
+.contact-link:hover {
+  text-decoration: underline;
+}

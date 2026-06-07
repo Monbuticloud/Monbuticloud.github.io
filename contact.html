@@ -54,7 +54,8 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="alternate icon" href="/favicon.ico" />
 
-    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="common.css" />
+    <link rel="stylesheet" href="contact.css" />
   </head>
   <body>
     <header>
@@ -79,83 +80,44 @@
     </header>
 
     <main>
-      <section
-        id="contact"
-        style="
-          padding: 6em 1.5em 3em;
-          max-width: 700px;
-          margin: 0 auto;
-          width: 100%;
-        "
-      >
-        <h2
-          style="
-            font-size: 2em;
-            font-weight: 700;
-            text-align: center;
-            margin-bottom: 1em;
-          "
-        >
-          Get in Touch
-        </h2>
-        <p
-          style="
-            text-align: center;
-            color: var(--medium-dark-rosy-taupe);
-            margin-bottom: 2em;
-          "
-        >
+      <section id="contact">
+        <h2>Get in Touch</h2>
+        <p class="contact-subtitle">
           Have a question, project idea, or just want to say hi? I'd love to
           hear from you.
         </p>
 
-        <div class="skill-grid" style="grid-template-columns: 1fr">
-          <div class="skill-card" style="text-align: center; padding: 1.5em">
-            <div class="skill-card-head" style="justify-content: center">
-              <span class="skill-name"
+        <div class="contact-list">
+          <div class="contact-card">
+            <div class="contact-card-head">
+              <span class="contact-card-name"
                 ><i class="fa-brands fa-github" aria-hidden="true"></i>
                 GitHub</span
               >
             </div>
-            <p
-              style="
-                font-size: 0.9em;
-                color: var(--medium-dark-rosy-taupe);
-                margin-top: 0.5em;
-              "
+            <a
+              href="https://github.com/monbuticloud"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="contact-link"
             >
-              <a
-                href="https://github.com/monbuticloud"
-                target="_blank"
-                rel="noopener noreferrer"
-                style="color: var(--berry-blush); text-decoration: none"
-              >
-                github.com/monbuticloud
-              </a>
-            </p>
+              github.com/monbuticloud
+            </a>
           </div>
 
-          <div class="skill-card" style="text-align: center; padding: 1.5em">
-            <div class="skill-card-head" style="justify-content: center">
-              <span class="skill-name"
+          <div class="contact-card">
+            <div class="contact-card-head">
+              <span class="contact-card-name"
                 ><i class="fa-solid fa-envelope" aria-hidden="true"></i>
                 Email</span
               >
             </div>
-            <p
-              style="
-                font-size: 0.9em;
-                color: var(--medium-dark-rosy-taupe);
-                margin-top: 0.5em;
-              "
+            <a
+              href="mailto:Hoangquocanhmon@icloud.com"
+              class="contact-link"
             >
-              <a
-                href="mailto:Hoangquocanhmon@icloud.com"
-                style="color: var(--berry-blush); text-decoration: none"
-              >
-                Hoangquocanhmon@icloud.com
-              </a>
-            </p>
+              Hoangquocanhmon@icloud.com
+            </a>
           </div>
         </div>
       </section>

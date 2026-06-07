@@ -59,14 +59,31 @@ section {
 }
 
 .glass {
-  background: rgba(255, 255, 255, 0.06);
+  background-color: rgba(255, 255, 255, 0.06);
+  /* Subtle surface micro-texture (scratches/smudges) */
+  background-image:
+    repeating-linear-gradient(
+      90deg,
+      transparent, transparent 2px,
+      rgba(255, 255, 255, 0.008) 2px, rgba(255, 255, 255, 0.008) 3px
+    ),
+    repeating-linear-gradient(
+      0deg,
+      transparent, transparent 5px,
+      rgba(255, 255, 255, 0.005) 5px, rgba(255, 255, 255, 0.005) 6px
+    );
   backdrop-filter: blur(13px) saturate(180%);
   -webkit-backdrop-filter: blur(13px) saturate(180%);
-  border-bottom: 2px solid rgba(255, 255, 255, 0.25);
+  /* Edge thickness — varied borders simulate light catching different edges */
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-top-color: rgba(255, 255, 255, 0.45);
+  border-bottom-color: rgba(255, 255, 255, 0.08);
   box-shadow:
     0 10px 30px rgba(0, 0, 0, 0.25),
-    inset 0 1px 0 rgba(255, 255, 255, 0.18);
+    inset 0 0 0 1px rgba(255, 255, 255, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
 
+  /* Primary + secondary specular highlights */
   &::before {
     content: "";
     position: absolute;
@@ -74,11 +91,35 @@ section {
     border-radius: inherit;
     pointer-events: none;
 
-    background: radial-gradient(
-      circle at 20% 0%,
-      rgba(255, 255, 255, 0.22),
-      transparent 55%
+    background:
+      /* Main highlight — brighter, tighter */
+      radial-gradient(
+        ellipse 60% 35% at 22% 8%,
+        rgba(255, 255, 255, 0.5) 0%,
+        rgba(255, 255, 255, 0.15) 40%,
+        transparent 70%
+      ),
+      /* Secondary bounce light (bottom-right rim) */
+      radial-gradient(
+        ellipse 30% 20% at 72% 90%,
+        rgba(255, 255, 255, 0.12) 0%,
+        transparent 60%
+      );
+  }
+
+  /* Inner pane — separated highlight for double-pane depth */
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 3px;
+    border-radius: inherit;
+    background: linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.08) 0%,
+      transparent 50%
     );
+    pointer-events: none;
+    z-index: -1;
   }
 }
 

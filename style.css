@@ -277,13 +277,10 @@
   border-radius: 3px;
   padding: 0.7em 1em;
   overflow: hidden;
-  transition:
-    transform 0.2s ease,
-    box-shadow 0.2s ease;
 
   &:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+    transform: perspective(800px) rotateX(var(--tilt-x, 0deg))
+      rotateY(var(--tilt-y, 0deg)) scale(1.1);
   }
 
   .skill-card-head {
@@ -350,42 +347,21 @@
             -6px 6px 0 var(--medium-dark-frosted-mint);
         }
       }
-    }
-  }
 
-  .comfort-row {
-    display: flex;
-    align-items: center;
-    gap: 0.5em;
+      &.expert {
+        background: var(--amber);
+        color: #fff;
 
-    .comfort-bar {
-      flex: 1;
-      height: 6px;
-      background: rgba(0, 0, 0, 0.08);
-      border-radius: 999px;
-      overflow: hidden;
-
-      .comfort-fill {
-        height: 100%;
-        border-radius: 999px;
-        background: linear-gradient(
-          90deg,
-          var(--lime-cream),
-          var(--medium-dark-lime-cream)
-        );
-        transition: width 0.4s ease;
+        &:hover {
+          transform: scale(1.1) translate(3px, -3px);
+          box-shadow:
+            -2px 2px 0 var(--light-amber),
+            -4px 4px 0 var(--amber),
+            -6px 6px 0 var(--medium-dark-amber);
+        }
       }
     }
 
-    .comfort-label {
-      font-size: 0.7em;
-      color: var(--medium-dark-rosy-taupe);
-      white-space: nowrap;
-      flex-shrink: 0;
-    }
-  }
-
-  @media (max-width: 600px) {
     .skill-card-head {
       flex-direction: column;
       align-items: flex-start;
@@ -393,4 +369,201 @@
   }
 }
 
+/* ───────── Skill Badge (extracted for use outside cards) ───────── */
+.skill-name {
+  font-weight: var(--bold-weight);
+  font-size: 1em;
+  color: var(--wine-plum);
+}
 
+.skill-badge {
+  font-size: 0.7em;
+  font-weight: var(--medium-weight);
+  padding: 0.2em 0.6em;
+  border-radius: 2px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transform-origin: bottom left;
+  transition:
+    transform 0.3s cubic-bezier(0.25, 0.1, 0.25, 1),
+    box-shadow 0.3s cubic-bezier(0.25, 0.1, 0.25, 1);
+
+  &.advanced {
+    background: var(--berry-blush);
+    color: #fff;
+
+    &:hover {
+      transform: scale(1.1) translate(3px, -3px);
+      box-shadow:
+        -2px 2px 0 var(--light-berry-blush),
+        -4px 4px 0 var(--light-dark-berry-blush),
+        -6px 6px 0 var(--medium-dark-berry-blush);
+    }
+  }
+
+  &.intermediate {
+    background: var(--lime-cream);
+    color: var(--dark-wine-plum);
+
+    &:hover {
+      transform: scale(1.1) translate(3px, -3px);
+      box-shadow:
+        -2px 2px 0 var(--light-lime-cream),
+        -4px 4px 0 var(--light-dark-lime-cream),
+        -6px 6px 0 var(--medium-dark-lime-cream);
+    }
+  }
+
+  &.beginner {
+    background: var(--light-dark-frosted-mint);
+    color: var(--dark-wine-plum);
+
+    &:hover {
+      transform: scale(1.1) translate(3px, -3px);
+      box-shadow:
+        -2px 2px 0 var(--frosted-mint),
+        -4px 4px 0 var(--light-dark-frosted-mint),
+        -6px 6px 0 var(--medium-dark-frosted-mint);
+    }
+  }
+
+  &.expert {
+    background: var(--amber);
+    color: #fff;
+
+    &:hover {
+      transform: scale(1.1) translate(3px, -3px);
+      box-shadow:
+        -2px 2px 0 var(--light-amber),
+        -4px 4px 0 var(--amber),
+        -6px 6px 0 var(--medium-dark-amber);
+    }
+  }
+}
+
+/* ───────── Skills Legend / Footer ───────── */
+.skills-legend {
+  margin-top: 2.5em;
+  padding: 1.4em 1.6em;
+  border-radius: 3px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1em 2.5em;
+  margin-bottom: 2.3em;
+  align-items: start;
+}
+
+.skills-legend .legend-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4em;
+}
+
+.skills-legend .legend-heading {
+  font-size: 0.75em;
+  font-weight: var(--bold-weight);
+  color: var(--medium-dark-rosy-taupe);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+
+.skills-legend .legend-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.35em;
+  flex-wrap: wrap;
+}
+
+.skills-legend .comfort-row .comfort-bar {
+  max-width: 120px;
+}
+
+.skills-legend .comfort-label {
+  font-size: 0.85em;
+  color: var(--wine-plum);
+}
+
+.skills-legend .legend-note {
+  width: 100%;
+  margin-top: 0.3em;
+  padding-top: 0.8em;
+  border-top: 1px solid rgba(255, 255, 255, 0.25);
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  font-size: 0.8em;
+  color: var(--light-dark-rosy-taupe);
+}
+
+.skills-legend .legend-note i {
+  color: var(--berry-blush);
+  font-size: 1.1em;
+  flex-shrink: 0;
+}
+
+.legend-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5em 3em;
+  align-items: flex-start;
+}
+
+.legend-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5em;
+}
+
+.legend-title {
+  font-size: 0.75em;
+  font-weight: var(--bold-weight);
+  color: var(--medium-dark-rosy-taupe);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+
+.legend-badges {
+  display: flex;
+  gap: 0.5em;
+  flex-wrap: wrap;
+}
+
+.legend-comfort {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4em;
+  min-width: 200px;
+}
+
+.legend-comfort-bar {
+  height: 6px;
+  background: rgba(0, 0, 0, 0.08);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.legend-comfort-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.7em;
+  color: var(--light-dark-rosy-taupe);
+}
+
+.legend-disclaimer {
+  width: 100%;
+  margin-top: 0.8em;
+  padding-top: 0.8em;
+  border-top: 1px solid rgba(255, 255, 255, 0.25);
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  font-size: 0.8em;
+  color: var(--light-dark-rosy-taupe);
+}
+
+.legend-disclaimer i {
+  color: var(--berry-blush);
+  font-size: 1.1em;
+  flex-shrink: 0;
+}

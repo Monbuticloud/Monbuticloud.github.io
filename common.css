@@ -66,6 +66,17 @@
   --dark-wine-plum: #391b21ff;
   /*Dark/pressed*/
 
+  /* ───────── Warm Amber ───────── */
+
+  --light-amber: #e3c07aff;
+  /*Expert/light*/
+  --amber: #c9953bff;
+  /*Expert/brand*/
+  --medium-dark-amber: #a87826ff;
+  /*Expert/active*/
+  --dark-amber: #8a621dff;
+  /*Expert/pressed*/
+
   --thin-weight: 100;
   --light-weight: 300;
   --regular-weight: 400;
@@ -100,6 +111,16 @@ body {
 
 section {
   position: relative;
+}
+
+/* ───────── Tilt ───────── */
+.tilt {
+  transform:
+    perspective(800px)
+    rotateX(var(--tilt-x, 0deg))
+    rotateY(var(--tilt-y, 0deg));
+  transition: transform 0.15s ease-out;
+  will-change: transform;
 }
 
 /* ───────── Glass Surface ───────── */

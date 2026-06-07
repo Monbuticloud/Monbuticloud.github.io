@@ -194,7 +194,6 @@ nav {
     isolation: isolate;
     /* prevent backdrop-filter blur from bleeding into button content */
     border: 1px solid var(--wine-plum);
-    padding: 0.5em 1em;
     border-radius: 5px;
     background-color: var(--semi-frosted-mint);
     /* Keep base anchored so scale doesn't drift bottom-left */
@@ -218,9 +217,10 @@ nav {
       color: var(--wine-plum);
       font-size: 1.2em;
       font-weight: var(--light-weight);
-      display: inline-flex;
+      display: flex;
       align-items: center;
       gap: 0.4em;
+      padding: 0.5em 1em;
 
       i {
         font-size: 0.9em;

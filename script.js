@@ -1,4 +1,20 @@
 // ═══════════════════════════════════════════════════════════
+// Deferred Font Awesome — load icons CSS after first paint
+// ═══════════════════════════════════════════════════════════
+
+(function loadFontAwesome() {
+  const link = document.createElement("link");
+  link.rel = "stylesheet";
+  link.href =
+    "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css";
+  link.integrity =
+    "sha512-2SwdPD6INVrV/lHTZbO2nodKhrnDdJK9/kg2XD1r9uGqPo1cUbujc+IYdlYdEErWNu69gVcYgdxlmVmzTWnetw==";
+  link.crossOrigin = "anonymous";
+  link.referrerPolicy = "no-referrer";
+  document.head.appendChild(link);
+})();
+
+// ═══════════════════════════════════════════════════════════
 // Rainbow Name Section (restored original)
 // ═══════════════════════════════════════════════════════════
 
@@ -74,7 +90,11 @@ const commands = [
     output: ["monbuticloud"],
     time: "0ms",
   },
-  { cmd: "ls", output: ["specialties", "projects"], time: "2ms" },
+  {
+    cmd: "ls",
+    output: ["specialties", "projects", "message.txt"],
+    time: "2ms",
+  },
   {
     cmd: "ls ./specialties",
     output: [
@@ -90,6 +110,13 @@ const commands = [
     output: [
       "ls: cannot open directory 'dir_name': Permission denied",
       "Maybe click on the projects link?",
+    ],
+    time: "1ms",
+  },
+  {
+    cmd: "cat message.txt",
+    output: [
+      "Hi, I'm Mon! I can do fullstack development, but I specialize in backend development.",
     ],
     time: "1ms",
   },

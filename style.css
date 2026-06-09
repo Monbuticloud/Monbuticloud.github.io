@@ -21,7 +21,7 @@
     left: 50%;
     transform: translate(-50%, -50%);
     font-size: 4em;
-    font-weight: var(--bold-weight);
+    font-weight: var(--weight-700);
     text-shadow:
       0 0 12px rgba(255, 255, 255, 0.7),
       0 2px 4px rgba(0, 0, 0, 0.3);
@@ -33,8 +33,7 @@
 .image-split {
   width: 100%;
   margin: 0px;
-  min-height: 20dvh;
-  max-height: 90dvh;
+  height: 110dvh;
 
   display: flex;
   overflow: hidden;
@@ -42,13 +41,10 @@
 
   > div {
     width: 50%;
-    /* height removed — flex stretch handles vertical sizing */
+    height: 100%;
   }
 
   > div:nth-child(1) {
-    overflow: hidden;
-    width: 50%;
-
     overflow: hidden;
     position: relative;
 
@@ -62,6 +58,7 @@
   }
 
   .terminal-panel {
+    height: 100%;
     background: #151525;
     padding: 1.2em;
     display: flex;
@@ -127,9 +124,9 @@
   min-height: 180px;
   font-size: clamp(0.7em, 1.6vw, 0.85em);
   line-height: 1.6;
-  overflow-y: auto;
+  overflow-y: scroll;
   scrollbar-width: thin;
-  scrollbar-color: var(--lime-cream) transparent;
+  scrollbar-color: var(--lime-cream-500) transparent;
   width: 100%;
   flex: 1;
   font-family:
@@ -141,7 +138,7 @@
   }
 
   &::-webkit-scrollbar-thumb {
-    background: var(--lime-cream);
+    background: var(--lime-cream-500);
     border-radius: 2px;
   }
 
@@ -156,26 +153,26 @@
   }
 
   .prompt {
-    color: var(--lime-cream);
-    font-weight: var(--bold-weight);
+    color: var(--lime-cream-500);
+    font-weight: var(--weight-700);
     margin-right: 0.4em;
     white-space: nowrap;
   }
 
   .typed-text {
-    color: var(--lime-cream);
+    color: var(--lime-cream-500);
   }
 
   .output-line {
-    color: var(--light-rosy-taupe);
+    color: var(--rosy-taupe-100);
     padding-left: 1.2em;
     display: block;
-    font-weight: var(--light-weight);
+    font-weight: var(--weight-300);
     font-size: 0.95em;
   }
 
   .cursor {
-    color: var(--lime-cream);
+    color: var(--lime-cream-500);
     animation: blink 1s step-end infinite;
     margin-left: 2px;
   }
@@ -213,7 +210,7 @@
 
   .pl-timing {
     margin-left: auto;
-    color: var(--light-rosy-taupe);
+    color: var(--rosy-taupe-100);
     font-size: 0.75em;
     opacity: 0.55;
     white-space: nowrap;
@@ -224,13 +221,13 @@
 
 .pl {
   display: inline-block;
-  background: var(--wine-plum);
+  background: var(--wine-plum-500);
   color: #ffffff;
   border-radius: 999px;
   padding: 0.08em 0.65em;
   font-size: 0.85em;
   line-height: 1.35;
-  font-weight: var(--medium-weight);
+  font-weight: var(--weight-500);
   white-space: nowrap;
   overflow: hidden;
 }
@@ -244,7 +241,7 @@
 
   h2 {
     font-size: 2em;
-    font-weight: var(--bold-weight);
+    font-weight: var(--weight-700);
     text-align: center;
     margin-bottom: 0.5em;
   }
@@ -255,11 +252,11 @@
 
   h3 {
     font-size: 1.3em;
-    font-weight: var(--medium-weight);
-    color: var(--medium-dark-rosy-taupe);
+    font-weight: var(--weight-500);
+    color: var(--rosy-taupe-700);
     margin-bottom: 0.8em;
     padding-left: 0.3em;
-    border-left: 3px solid var(--lime-cream);
+    border-left: 3px solid var(--lime-cream-500);
   }
 }
 
@@ -291,14 +288,14 @@
     margin-bottom: 0.5em;
 
     .skill-name {
-      font-weight: var(--bold-weight);
+      font-weight: var(--weight-700);
       font-size: 1em;
-      color: var(--wine-plum);
+      color: var(--wine-plum-500);
     }
 
     .skill-badge {
       font-size: 0.7em;
-      font-weight: var(--medium-weight);
+      font-weight: var(--weight-500);
       padding: 0.2em 0.6em;
       border-radius: 2px;
       white-space: nowrap;
@@ -310,54 +307,54 @@
         box-shadow 0.3s cubic-bezier(0.25, 0.1, 0.25, 1);
 
       &.advanced {
-        background: var(--berry-blush);
+        background: var(--berry-blush-500);
         color: #fff;
 
         &:hover {
           transform: scale(1.1) translate(3px, -3px);
           box-shadow:
-            -2px 2px 0 var(--light-berry-blush),
-            -4px 4px 0 var(--light-dark-berry-blush),
-            -6px 6px 0 var(--medium-dark-berry-blush);
+            -2px 2px 0 var(--berry-blush-100),
+            -4px 4px 0 var(--berry-blush-600),
+            -6px 6px 0 var(--berry-blush-700);
         }
       }
 
       &.intermediate {
-        background: var(--lime-cream);
-        color: var(--dark-wine-plum);
+        background: var(--lime-cream-500);
+        color: var(--wine-plum-900);
 
         &:hover {
           transform: scale(1.1) translate(3px, -3px);
           box-shadow:
-            -2px 2px 0 var(--light-lime-cream),
-            -4px 4px 0 var(--light-dark-lime-cream),
-            -6px 6px 0 var(--medium-dark-lime-cream);
+            -2px 2px 0 var(--lime-cream-100),
+            -4px 4px 0 var(--lime-cream-600),
+            -6px 6px 0 var(--lime-cream-700);
         }
       }
 
       &.beginner {
-        background: var(--light-dark-frosted-mint);
-        color: var(--dark-wine-plum);
+        background: var(--frosted-mint-600);
+        color: var(--wine-plum-900);
 
         &:hover {
           transform: scale(1.1) translate(3px, -3px);
           box-shadow:
-            -2px 2px 0 var(--frosted-mint),
-            -4px 4px 0 var(--light-dark-frosted-mint),
-            -6px 6px 0 var(--medium-dark-frosted-mint);
+            -2px 2px 0 var(--frosted-mint-500),
+            -4px 4px 0 var(--frosted-mint-600),
+            -6px 6px 0 var(--frosted-mint-700);
         }
       }
 
       &.expert {
-        background: var(--amber);
+        background: var(--amber-500);
         color: #fff;
 
         &:hover {
           transform: scale(1.1) translate(3px, -3px);
           box-shadow:
-            -2px 2px 0 var(--light-amber),
-            -4px 4px 0 var(--amber),
-            -6px 6px 0 var(--medium-dark-amber);
+            -2px 2px 0 var(--amber-100),
+            -4px 4px 0 var(--amber-500),
+            -6px 6px 0 var(--amber-700);
         }
       }
     }
@@ -367,18 +364,51 @@
       align-items: flex-start;
     }
   }
+
+  .comfort-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+
+    .comfort-bar {
+      flex: 1;
+      height: 6px;
+      background: rgba(0, 0, 0, 0.08);
+      border-radius: 999px;
+      overflow: hidden;
+      min-width: 50px;
+
+      .comfort-fill {
+        height: 100%;
+        border-radius: 999px;
+        background: linear-gradient(
+          90deg,
+          var(--lime-cream-500),
+          var(--lime-cream-700)
+        );
+        transition: width 0.4s ease;
+      }
+    }
+
+    .comfort-label {
+      font-size: 0.7em;
+      color: var(--rosy-taupe-600);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+  }
 }
 
 /* ───────── Skill Badge (extracted for use outside cards) ───────── */
 .skill-name {
-  font-weight: var(--bold-weight);
+  font-weight: var(--weight-700);
   font-size: 1em;
-  color: var(--wine-plum);
+  color: var(--wine-plum-500);
 }
 
 .skill-badge {
   font-size: 0.7em;
-  font-weight: var(--medium-weight);
+  font-weight: var(--weight-500);
   padding: 0.2em 0.6em;
   border-radius: 2px;
   white-space: nowrap;
@@ -389,54 +419,54 @@
     box-shadow 0.3s cubic-bezier(0.25, 0.1, 0.25, 1);
 
   &.advanced {
-    background: var(--berry-blush);
+    background: var(--berry-blush-500);
     color: #fff;
 
     &:hover {
       transform: scale(1.1) translate(3px, -3px);
       box-shadow:
-        -2px 2px 0 var(--light-berry-blush),
-        -4px 4px 0 var(--light-dark-berry-blush),
-        -6px 6px 0 var(--medium-dark-berry-blush);
+        -2px 2px 0 var(--berry-blush-100),
+        -4px 4px 0 var(--berry-blush-600),
+        -6px 6px 0 var(--berry-blush-700);
     }
   }
 
   &.intermediate {
-    background: var(--lime-cream);
-    color: var(--dark-wine-plum);
+    background: var(--lime-cream-500);
+    color: var(--wine-plum-900);
 
     &:hover {
       transform: scale(1.1) translate(3px, -3px);
       box-shadow:
-        -2px 2px 0 var(--light-lime-cream),
-        -4px 4px 0 var(--light-dark-lime-cream),
-        -6px 6px 0 var(--medium-dark-lime-cream);
+        -2px 2px 0 var(--lime-cream-100),
+        -4px 4px 0 var(--lime-cream-600),
+        -6px 6px 0 var(--lime-cream-700);
     }
   }
 
   &.beginner {
-    background: var(--light-dark-frosted-mint);
-    color: var(--dark-wine-plum);
+    background: var(--frosted-mint-600);
+    color: var(--wine-plum-900);
 
     &:hover {
       transform: scale(1.1) translate(3px, -3px);
       box-shadow:
-        -2px 2px 0 var(--frosted-mint),
-        -4px 4px 0 var(--light-dark-frosted-mint),
-        -6px 6px 0 var(--medium-dark-frosted-mint);
+        -2px 2px 0 var(--frosted-mint-500),
+        -4px 4px 0 var(--frosted-mint-600),
+        -6px 6px 0 var(--frosted-mint-700);
     }
   }
 
   &.expert {
-    background: var(--amber);
+    background: var(--amber-500);
     color: #fff;
 
     &:hover {
       transform: scale(1.1) translate(3px, -3px);
       box-shadow:
-        -2px 2px 0 var(--light-amber),
-        -4px 4px 0 var(--amber),
-        -6px 6px 0 var(--medium-dark-amber);
+        -2px 2px 0 var(--amber-100),
+        -4px 4px 0 var(--amber-500),
+        -6px 6px 0 var(--amber-700);
     }
   }
 }
@@ -461,8 +491,8 @@
 
 .skills-legend .legend-heading {
   font-size: 0.75em;
-  font-weight: var(--bold-weight);
-  color: var(--medium-dark-rosy-taupe);
+  font-weight: var(--weight-700);
+  color: var(--rosy-taupe-700);
   text-transform: uppercase;
   letter-spacing: 0.8px;
 }
@@ -481,7 +511,7 @@
 
 .skills-legend .comfort-label {
   font-size: 0.85em;
-  color: var(--wine-plum);
+  color: var(--wine-plum-500);
 }
 
 .skills-legend .legend-note {
@@ -493,11 +523,11 @@
   align-items: center;
   gap: 0.5em;
   font-size: 0.8em;
-  color: var(--light-dark-rosy-taupe);
+  color: var(--rosy-taupe-600);
 }
 
 .skills-legend .legend-note i {
-  color: var(--berry-blush);
+  color: var(--berry-blush-500);
   font-size: 1.1em;
   flex-shrink: 0;
 }
@@ -517,8 +547,8 @@
 
 .legend-title {
   font-size: 0.75em;
-  font-weight: var(--bold-weight);
-  color: var(--medium-dark-rosy-taupe);
+  font-weight: var(--weight-700);
+  color: var(--rosy-taupe-700);
   text-transform: uppercase;
   letter-spacing: 0.8px;
 }
@@ -547,7 +577,7 @@
   display: flex;
   justify-content: space-between;
   font-size: 0.7em;
-  color: var(--light-dark-rosy-taupe);
+  color: var(--rosy-taupe-600);
 }
 
 .legend-disclaimer {
@@ -559,11 +589,30 @@
   align-items: center;
   gap: 0.5em;
   font-size: 0.8em;
-  color: var(--light-dark-rosy-taupe);
+  color: var(--rosy-taupe-600);
 }
 
 .legend-disclaimer i {
-  color: var(--berry-blush);
+  color: var(--berry-blush-500);
   font-size: 1.1em;
   flex-shrink: 0;
+}
+
+/* ───────── Square Grid Section ───────── */
+#grid-section {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  padding: 2em 0;
+}
+
+#grid-container {
+  width: 100%;
+  background: rgba(0, 0, 0, 0.06);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+#grid-container canvas {
+  display: block;
 }

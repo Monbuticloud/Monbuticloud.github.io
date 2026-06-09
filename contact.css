@@ -8,14 +8,14 @@
 
 #contact h2 {
   font-size: 2em;
-  font-weight: var(--bold-weight);
+  font-weight: var(--weight-700);
   text-align: center;
   margin-bottom: 1em;
 }
 
 .contact-subtitle {
   text-align: center;
-  color: var(--medium-dark-rosy-taupe);
+  color: var(--rosy-taupe-700);
   margin-bottom: 2em;
 }
 
@@ -52,14 +52,14 @@
 }
 
 .contact-card-name {
-  font-weight: var(--bold-weight);
+  font-weight: var(--weight-700);
   font-size: 1em;
-  color: var(--wine-plum);
+  color: var(--wine-plum-500);
 }
 
 .contact-link {
   font-size: 0.9em;
-  color: var(--berry-blush);
+  color: var(--berry-blush-500);
   text-decoration: none;
   margin-top: 0.5em;
   display: inline-block;

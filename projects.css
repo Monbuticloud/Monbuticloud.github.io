@@ -8,14 +8,14 @@
 
 #projects h2 {
   font-size: 2em;
-  font-weight: var(--bold-weight);
+  font-weight: var(--weight-700);
   text-align: center;
   margin-bottom: 1em;
 }
 
 .projects-subtitle {
   text-align: center;
-  color: var(--medium-dark-rosy-taupe);
+  color: var(--rosy-taupe-700);
   margin-bottom: 2em;
 }
 
@@ -35,14 +35,14 @@
 }
 
 .project-name {
-  font-weight: var(--bold-weight);
+  font-weight: var(--weight-700);
   font-size: 1.1em;
-  color: var(--wine-plum);
+  color: var(--wine-plum-500);
   margin-bottom: 0.5em;
 }
 
 .project-desc {
   font-size: 0.85em;
-  color: var(--medium-dark-rosy-taupe);
+  color: var(--rosy-taupe-700);
   line-height: 1.5;
 }

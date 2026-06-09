@@ -1,100 +1,129 @@
 :root {
   /* ───────── Frosted Mint ───────── */
 
-  --light-frosted-mint: #edf9f0ff;
+  --frosted-mint-100: #edf9f0ff;
   /*Surface/light*/
-  --frosted-mint: #d4f2dbff;
-  /*Surface/background*/
-  --light-dark-frosted-mint: #b8e0b1ff;
+  --frosted-mint-500: #d4f2dbff;
+  /*Surface/background — OG*/
+  --frosted-mint-600: #b8e0b1ff;
   /*Surface/hover*/
-  --medium-dark-frosted-mint: #9cd089ff;
+  --frosted-mint-700: #9cd089ff;
   /*Surface/active*/
-  --dark-frosted-mint: #7bbf6fff;
+  --frosted-mint-900: #7bbf6fff;
   /*Surface/pressed*/
-  --semi-frosted-mint: rgba(212, 242, 219, 0.4);
+  --semi-frosted-mint-500: rgba(212, 242, 219, 0.4);
   /*Surface/semi-transparent*/
+  --semi-lime-cream-500: rgba(206, 247, 160, 0.4);
+  /*Accent/semi-transparent*/
+  --semi-rosy-taupe-500: rgba(186, 151, 144, 0.4);
+  /*Muted/semi-transparent*/
+  --semi-berry-blush-500: rgba(145, 77, 118, 0.4);
+  /*Primary/semi-transparent*/
+  --semi-wine-plum-500: rgba(105, 53, 63, 0.4);
+  /*Dark/semi-transparent*/
+  --semi-amber-500: rgba(201, 149, 59, 0.4);
+  /*Expert/semi-transparent*/
 
   /* ───────── Lime Cream ───────── */
 
-  --light-lime-cream: #e5fccaff;
+  --lime-cream-100: #e5fccaff;
   /*Accent/light*/
-  --lime-cream: #cef7a0ff;
-  /*Accent/highlight*/
-  --light-dark-lime-cream: #b6eb7cff;
+  --lime-cream-500: #cef7a0ff;
+  /*Accent/highlight — OG*/
+  --lime-cream-600: #b6eb7cff;
   /*Accent/hover*/
-  --medium-dark-lime-cream: #9bdd5cff;
+  --lime-cream-700: #9bdd5cff;
   /*Accent/active*/
-  --dark-lime-cream: #7fc042ff;
+  --lime-cream-900: #7fc042ff;
   /*Accent/pressed*/
 
   /* ───────── Rosy Taupe ───────── */
 
-  --light-rosy-taupe: #d8c1bcff;
+  --rosy-taupe-100: #d8c1bcff;
   /*Muted/light*/
-  --rosy-taupe: #ba9790ff;
-  /*Muted/support*/
-  --light-dark-rosy-taupe: #a9827aff;
+  --rosy-taupe-500: #ba9790ff;
+  /*Muted/support — OG*/
+  --rosy-taupe-600: #a9827aff;
   /*Muted/hover*/
-  --medium-dark-rosy-taupe: #966c64ff;
+  --rosy-taupe-700: #966c64ff;
   /*Muted/active*/
-  --dark-rosy-taupe: #7d5650ff;
+  --rosy-taupe-900: #7d5650ff;
   /*Muted/pressed*/
 
   /* ───────── Berry Blush ───────── */
 
-  --light-berry-blush: #b6789dff;
+  --berry-blush-100: #b6789dff;
   /*Primary/light*/
-  --berry-blush: #914d76ff;
-  /*Primary/brand*/
-  --light-dark-berry-blush: #7d4065ff;
+  --berry-blush-500: #914d76ff;
+  /*Primary/brand — OG*/
+  --berry-blush-600: #7d4065ff;
   /*Primary/hover*/
-  --medium-dark-berry-blush: #693454ff;
+  --berry-blush-700: #693454ff;
   /*Primary/active*/
-  --dark-berry-blush: #542843ff;
+  --berry-blush-900: #542843ff;
   /*Primary/pressed*/
 
   /* ───────── Wine Plum ───────── */
 
-  --light-wine-plum: #87505bff;
+  --wine-plum-100: #87505bff;
   /*Dark/light*/
-  --wine-plum: #69353fff;
-  /*Dark/base*/
-  --light-dark-wine-plum: #592c35ff;
+  --wine-plum-500: #69353fff;
+  /*Dark/base — OG*/
+  --wine-plum-600: #592c35ff;
   /*Dark/hover*/
-  --medium-dark-wine-plum: #49242bff;
+  --wine-plum-700: #49242bff;
   /*Dark/active*/
-  --dark-wine-plum: #391b21ff;
+  --wine-plum-900: #391b21ff;
   /*Dark/pressed*/
 
   /* ───────── Warm Amber ───────── */
 
-  --light-amber: #e3c07aff;
+  --amber-100: #e3c07aff;
   /*Expert/light*/
-  --amber: #c9953bff;
-  /*Expert/brand*/
-  --medium-dark-amber: #a87826ff;
+  --amber-500: #c9953bff;
+  /*Expert/brand — OG*/
+  --amber-600: #b88630ff;
+  /*Expert/hover*/
+  --amber-700: #a87826ff;
   /*Expert/active*/
-  --dark-amber: #8a621dff;
+  --amber-900: #8a621dff;
   /*Expert/pressed*/
 
-  --thin-weight: 100;
-  --light-weight: 300;
-  --regular-weight: 400;
-  --medium-weight: 500;
-  --bold-weight: 700;
-  --black-weight: 900;
+  /* ───────── Font Weights ───────── */
+  --weight-100: 100;
+  --weight-200: 200;
+  --weight-300: 300;
+  --weight-400: 400;
+  --weight-500: 500; /* OG */
+  --weight-600: 600;
+  --weight-700: 700;
+  --weight-800: 800;
+  --weight-900: 900;
 
   --extra-small-font-size: 0.75em;
   --small-font-size: 0.875em;
   --medium-font-size: 1em;
   --large-font-size: 1.25em;
+
+  /* ──────────────────────────── Semantic aliases ──────────────────── */
+  --Primary: var(--berry-blush-500);
+  --Secondary: var(--wine-plum-500);
+  --Tertiary: var(--amber-500);
+
+  /* Interactive state: light mode darkens, dark mode lightens */
+  --hover-brightness: 0.85;
+  --active-brightness: 0.7;
+
+  /* Theme colors (overridable by body.dark) */
+  --body-text: var(--wine-plum-500);
+  --body-bg: var(--frosted-mint-500);
 }
 
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
-  color: var(--wine-plum);
+  color: var(--body-text);
   font-family: Helvetica, Arial, sans-serif, "Times New Roman", Times, serif;
 }
 
@@ -106,7 +135,15 @@ body {
 }
 
 body {
-  background: var(--frosted-mint);
+  background: var(--body-bg);
+  transition: background-color 0.3s ease;
+}
+
+html[data-theme-mode="Dark"] {
+  --body-text: var(--frosted-mint-100);
+  --body-bg: #1a1a2e;
+  --hover-brightness: 1.15;
+  --active-brightness: 1.3;
 }
 
 section {
@@ -115,9 +152,7 @@ section {
 
 /* ───────── Tilt ───────── */
 .tilt {
-  transform:
-    perspective(800px)
-    rotateX(var(--tilt-x, 0deg))
+  transform: perspective(800px) rotateX(var(--tilt-x, 0deg))
     rotateY(var(--tilt-y, 0deg));
   transition: transform 0.15s ease-out;
   will-change: transform;
@@ -214,9 +249,9 @@ nav {
   div {
     isolation: isolate;
     /* prevent backdrop-filter blur from bleeding into button content */
-    border: 1px solid var(--wine-plum);
+    border: 1px solid var(--wine-plum-500);
     border-radius: 5px;
-    background-color: var(--semi-frosted-mint);
+    background-color: var(--semi-frosted-mint-500);
     /* Keep base anchored so scale doesn't drift bottom-left */
     transform-origin: bottom left;
     transition:
@@ -225,19 +260,19 @@ nav {
       box-shadow 0.3s cubic-bezier(0.25, 0.1, 0.25, 1);
 
     &:hover {
-      background-color: var(--lime-cream);
+      background-color: var(--lime-cream-500);
       transform: scale(1.1) translate(5px, -5px);
       box-shadow:
-        -2px 2px 0 var(--light-dark-frosted-mint),
-        -4px 4px 0 var(--medium-dark-frosted-mint),
-        -6px 6px 0 var(--dark-frosted-mint);
+        -2px 2px 0 var(--frosted-mint-600),
+        -4px 4px 0 var(--frosted-mint-700),
+        -6px 6px 0 var(--frosted-mint-900);
     }
 
     a {
       text-decoration: none;
-      color: var(--wine-plum);
+      color: var(--body-text);
       font-size: 1.2em;
-      font-weight: var(--light-weight);
+      font-weight: var(--weight-300);
       display: flex;
       align-items: center;
       gap: 0.4em;
@@ -270,8 +305,8 @@ footer {
 
   p {
     font-size: var(--small-font-size);
-    font-weight: var(--light-weight);
-    color: var(--light-dark-rosy-taupe);
+    font-weight: var(--weight-300);
+    color: var(--rosy-taupe-600);
     letter-spacing: 0.5px;
   }
 }

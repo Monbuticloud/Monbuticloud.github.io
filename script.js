@@ -1,6 +1,4 @@
-// ═══════════════════════════════════════════════════════════
-// Deferred Font Awesome — load icons CSS after first paint
-// ═══════════════════════════════════════════════════════════
+/// Deferred Font Awesome — load icons CSS after first paint
 
 (function loadFontAwesome() {
   const link = document.createElement("link");
@@ -14,27 +12,29 @@
   document.head.appendChild(link);
 })();
 
-// ═══════════════════════════════════════════════════════════
-// Rainbow Name Section (restored original)
-// ═══════════════════════════════════════════════════════════
+/// Rainbow Name Section
+
+function getRainbow(ratio) {
+  ratio = Math.min(1, Math.max(0, ratio));
+  const hue = ratio * 359;
+  return `hsl(${hue}, 55%, 65%)`;
+}
 
 const nameSection = document.getElementById("name-section");
 const numSegments = 30;
 
 for (let i = 0; i < numSegments; i++) {
-  const div = document.createElement("div");
-  div.style.backgroundColor = getRainbow(i / numSegments);
-  div.style.flex = "1";
-  nameSection.appendChild(div);
+  const segment = document.createElement("div");
+  segment.style.backgroundColor = getRainbow(i / numSegments);
+  segment.style.flex = "1";
+  nameSection.appendChild(segment);
 }
 
 function shiftBg(container) {
   const divs = [...container.querySelectorAll("div")];
-  const first = getComputedStyle(divs[0]).backgroundColor;
+  const first = divs[0].style.backgroundColor;
   for (let i = 0; i < divs.length - 1; i++) {
-    divs[i].style.backgroundColor = getComputedStyle(
-      divs[i + 1],
-    ).backgroundColor;
+    divs[i].style.backgroundColor = divs[i + 1].style.backgroundColor;
   }
   divs[divs.length - 1].style.backgroundColor = first;
 }
@@ -44,15 +44,19 @@ setInterval(shiftBg, 75, nameSection);
 const nameSpan = document.getElementById("name-span");
 const segmentWidthPx = 50;
 
-const stops = [];
-for (let i = 0; i < numSegments; i++) {
-  const color = getRainbow(i / numSegments);
-  const startPx = i * segmentWidthPx;
-  const endPx = (i + 1) * segmentWidthPx;
-  stops.push(`${color} ${startPx}px`);
-  stops.push(`${color} ${endPx}px`);
+function buildRainbowStops(segmentCount, widthPx) {
+  const stops = [];
+  for (let i = 0; i < segmentCount; i++) {
+    const color = getRainbow(i / segmentCount);
+    const startPx = i * widthPx;
+    const endPx = (i + 1) * widthPx;
+    stops.push(`${color} ${startPx}px`);
+    stops.push(`${color} ${endPx}px`);
+  }
+  return stops;
 }
 
+const stops = buildRainbowStops(numSegments, segmentWidthPx);
 const totalWidth = numSegments * segmentWidthPx;
 nameSpan.style.backgroundImage = `linear-gradient(to right, ${stops.join(", ")})`;
 nameSpan.style.backgroundSize = `${totalWidth}px 100%`;
@@ -64,21 +68,13 @@ setInterval(() => {
   nameSpan.style.backgroundPosition = `${offset}px 0`;
 }, 75);
 
-function getRainbow(t) {
-  t = Math.min(1, Math.max(0, t));
-  const hue = t * 359;
-  return `hsl(${hue}, 55%, 65%)`;
-}
-
-// ═══════════════════════════════════════════════════════════
-// Compact Terminal — image-split right panel
-// ═══════════════════════════════════════════════════════════
+/// Compact Terminal — image-split right panel
 
 const PROMPT = ">";
 const TYPING_SPEED = 30;
-const LINE_PAUSE = 500;
+const LINE_PAUSE = 1000;
 const OUTPUT_PAUSE = 220;
-const INITIAL_DELAY = 1000;
+const INITIAL_DELAY = 2000;
 
 const termHistory = document.getElementById("term-history");
 const typedSpan = document.querySelector(".term-body .typed-text");
@@ -131,37 +127,37 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function appendPowerlineHeader(time) {
-  const t = time || "0ms";
+function appendPowerlineHeader(executionTime) {
+  const t = executionTime || "0ms";
   // Full path pill:  ( /Users/monbuticloud )
-  const line1 = document.createElement("div");
-  line1.className = "term-line pl-line pl-line-right";
-  const seg1 = document.createElement("span");
-  seg1.className = "pl";
-  seg1.textContent = "/Users/monbuticloud";
-  line1.appendChild(seg1);
-  termHistory.appendChild(line1);
+  const fullPathLine = document.createElement("div");
+  fullPathLine.className = "term-line pl-line pl-line-right";
+  const fullPathSegment = document.createElement("span");
+  fullPathSegment.className = "pl";
+  fullPathSegment.textContent = "/Users/monbuticloud";
+  fullPathLine.appendChild(fullPathSegment);
+  termHistory.appendChild(fullPathLine);
 
   // Short path pill:  ( ~ )  + timing
-  const line2 = document.createElement("div");
-  line2.className = "term-line pl-line";
-  line2.append(document.createTextNode("  "));
-  const seg2 = document.createElement("span");
-  seg2.className = "pl";
-  seg2.textContent = "~";
-  line2.appendChild(seg2);
-  const timing = document.createElement("span");
-  timing.className = "pl-timing";
-  timing.textContent = t;
-  line2.appendChild(timing);
-  termHistory.appendChild(line2);
+  const shortPathLine = document.createElement("div");
+  shortPathLine.className = "term-line pl-line";
+  shortPathLine.append(document.createTextNode("  "));
+  const shortPathSegment = document.createElement("span");
+  shortPathSegment.className = "pl";
+  shortPathSegment.textContent = "~";
+  shortPathLine.appendChild(shortPathSegment);
+  const timingSpan = document.createElement("span");
+  timingSpan.className = "pl-timing";
+  timingSpan.textContent = t;
+  shortPathLine.appendChild(timingSpan);
+  termHistory.appendChild(shortPathLine);
 }
 
-function appendLine(html) {
-  const div = document.createElement("div");
-  div.className = "term-line";
-  div.innerHTML = html;
-  termHistory.appendChild(div);
+function appendLine(htmlContent) {
+  const lineElement = document.createElement("div");
+  lineElement.className = "term-line";
+  lineElement.innerHTML = htmlContent;
+  termHistory.appendChild(lineElement);
 }
 
 function freezePromptLine() {
@@ -204,3 +200,154 @@ async function runTerminal() {
 }
 
 runTerminal();
+
+/// Square Grid — canvas-based generative pattern
+
+const GRID_WIDTH = 40;
+const GRID_HEIGHT = 30;
+const DISTORT_RADIUS = 250;
+const DISTORT_RADIUS_SQ = DISTORT_RADIUS * DISTORT_RADIUS;
+const MAX_SHIFT = 20;
+const TOTAL_CELLS = GRID_WIDTH * GRID_HEIGHT;
+const NUM_PHASES = GRID_WIDTH + GRID_HEIGHT - 1;
+const lightnessCache = [];
+const PHASE_INTERVAL = 200; // ms
+
+const gridState = { canvas: null, ctx: null, cellSize: 0, w: 0, h: 0, offsetX: 0, offsetY: 0 };
+const lastPointer = { clientX: -1, clientY: -1 };
+let diagonalPhase = 0;
+let prevPhase = 0;
+let lastPhaseTime = 0;
+
+function buildLightnessCache() {
+  for (let phase = 0; phase < NUM_PHASES; phase++) {
+    const arr = new Float64Array(TOTAL_CELLS);
+    for (let i = 0; i < TOTAL_CELLS; i++) {
+      arr[i] = getDiagonalLightness(Math.floor(i / GRID_WIDTH), i % GRID_WIDTH, phase);
+    }
+    lightnessCache.push(arr);
+  }
+}
+
+function getDiagonalLightness(row, col, phase = 0) {
+  const maxDiagonal = GRID_WIDTH + GRID_HEIGHT - 2;
+  const progress = ((row + col + phase) % (maxDiagonal + 1)) / maxDiagonal;
+  const triangleWave = progress < 0.5 ? progress * 2 : 2 - progress * 2;
+  return 25 + triangleWave * 50;
+}
+
+function initCanvas() {
+  const container = document.getElementById("grid-container");
+  if (!container) return;
+
+  container.innerHTML = "";
+  container.style.contain = "style layout";
+
+  const canvas = document.createElement("canvas");
+  canvas.id = "grid-canvas";
+  container.appendChild(canvas);
+
+  const rect = container.getBoundingClientRect();
+  const cellSize = rect.width / GRID_WIDTH;
+  const gridH = cellSize * GRID_HEIGHT;
+
+  canvas.width = rect.width * devicePixelRatio;
+  canvas.height = gridH * devicePixelRatio;
+  canvas.style.width = `${rect.width}px`;
+  canvas.style.height = `${gridH}px`;
+  const ctx = canvas.getContext("2d");
+  ctx.scale(devicePixelRatio, devicePixelRatio);
+
+  gridState.canvas = canvas;
+  gridState.ctx = ctx;
+  gridState.cellSize = cellSize;
+  gridState.w = rect.width;
+  gridState.h = gridH;
+  gridState.offsetX = 0;
+  gridState.offsetY = 0;
+
+  if (lightnessCache.length === 0) buildLightnessCache();
+  lastPhaseTime = performance.now();
+  cancelAnimationFrame(rafId);
+  rafId = requestAnimationFrame(drawFrame);
+}
+
+function drawFrame(timestamp) {
+  const { ctx, cellSize, w, h, offsetX, offsetY, canvas } = gridState;
+  if (!ctx) { rafId = requestAnimationFrame(drawFrame); return; }
+
+  // Advance phase with drift-free timing
+  while (timestamp - lastPhaseTime >= PHASE_INTERVAL) {
+    prevPhase = diagonalPhase;
+    diagonalPhase = (diagonalPhase + 1) % NUM_PHASES;
+    lastPhaseTime += PHASE_INTERVAL;
+  }
+  const t = Math.min((timestamp - lastPhaseTime) / PHASE_INTERVAL, 1);
+
+  // Recalculate mouse relative to canvas (handles scroll/resize)
+  let mx = -1, my = -1;
+  if (lastPointer.clientX !== -1) {
+    const cr = canvas.getBoundingClientRect();
+    mx = lastPointer.clientX - cr.left;
+    my = lastPointer.clientY - cr.top;
+  }
+
+  const prevCache = lightnessCache[prevPhase];
+  const currCache = lightnessCache[diagonalPhase];
+
+  ctx.clearRect(0, 0, w, h);
+
+  for (let row = 0; row < GRID_HEIGHT; row++) {
+    for (let col = 0; col < GRID_WIDTH; col++) {
+      const idx = row * GRID_WIDTH + col;
+
+      // Interpolated lightness
+      const lightness = prevCache[idx] + (currCache[idx] - prevCache[idx]) * t;
+      ctx.fillStyle = `hsl(0, 0%, ${lightness}%)`;
+
+      // Position with optional mouse distortion
+      let x = offsetX + col * cellSize;
+      let y = offsetY + row * cellSize;
+
+      if (mx !== -1) {
+        const cx = x + cellSize / 2;
+        const cy = y + cellSize / 2;
+        const dx = cx - mx;
+        const dy = cy - my;
+        const distSq = dx * dx + dy * dy;
+
+        if (distSq < DISTORT_RADIUS_SQ && distSq > 0) {
+          const dist = Math.sqrt(distSq);
+          const ratio = dist / DISTORT_RADIUS;
+          const falloff = 1 - ratio * ratio * ratio;
+          const shift = falloff * MAX_SHIFT;
+          x += (dx / dist) * shift;
+          y += (dy / dist) * shift;
+        }
+      }
+
+      ctx.fillRect(x, y, cellSize, cellSize);
+    }
+  }
+
+  rafId = requestAnimationFrame(drawFrame);
+}
+
+// Events — track mouse anywhere near the grid
+window.addEventListener("mousemove", (e) => {
+  lastPointer.clientX = e.clientX;
+  lastPointer.clientY = e.clientY;
+});
+
+// Init + resize
+function debounce(fn, ms) {
+  let timer;
+  return (...args) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn(...args), ms);
+  };
+}
+
+let rafId = 0;
+initCanvas();
+window.addEventListener("resize", debounce(initCanvas, 150));

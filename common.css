@@ -233,8 +233,58 @@ section {
   }
 }
 
+/* ───────── Cross-document View Transitions ───────── */
+@view-transition {
+  navigation: auto;
+}
+
+/* Keep nav perfectly stationary */
+::view-transition-group(nav) {
+  animation-duration: 0s;
+}
+
+::view-transition-old(nav) {
+  animation-duration: 0s;
+}
+
+::view-transition-new(nav) {
+  animation-duration: 0s;
+}
+
+/* Slide the page content instead of fade */
+@keyframes slide-out-left {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(-20%);
+    opacity: 0;
+  }
+}
+
+@keyframes slide-in-right {
+  from {
+    transform: translateX(20%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+::view-transition-old(root) {
+  animation: slide-out-left 0.5s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+::view-transition-new(root) {
+  animation: slide-in-right 0.5s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
 /* ───────── Navigation ───────── */
 nav {
+  view-transition-name: nav;
   position: fixed;
   top: 0;
   left: 0;

@@ -80,7 +80,7 @@ const termHistory = document.getElementById("term-history");
 const typedSpan = document.querySelector(".term-body .typed-text");
 const termBody = document.getElementById("term-body");
 
-const commands = [
+const introCommands = [
   {
     cmd: "whoami",
     output: ["monbuticloud"],
@@ -176,7 +176,7 @@ async function typeText(text) {
 async function runTerminal() {
   await sleep(INITIAL_DELAY);
 
-  for (const entry of commands) {
+  for (const entry of introCommands) {
     appendPowerlineHeader(entry.time);
     await typeText(entry.cmd);
     await sleep(LINE_PAUSE);
@@ -197,9 +197,147 @@ async function runTerminal() {
 
     termBody.scrollTop = termBody.scrollHeight;
   }
+
+  // Intro done — unlock input
+  termControl.enable();
 }
 
 runTerminal();
+
+/// ───────── Terminal Commands ─────────
+/// Maps keyword → { handler, description }.
+/// Add new commands here.
+
+const commands = {
+  echo: {
+    description: "Echo back what you type",
+    handler: (args, output) => output(`  ${args}`),
+  },
+  help: {
+    description: "Show available commands",
+    handler: (_args, output) => {
+      output("  Available commands:");
+      for (const [name, cmd] of Object.entries(commands)) {
+        output(`    ${name}  —  ${cmd.description}`);
+      }
+    },
+  },
+  cat: {
+    description: "Concatenate files",
+    handler: (args, output) => {
+      if (args === "message.txt") {
+        output("  Hi, I'm Mon! I can do fullstack development, but I specialize in backend development.");
+      } else if (args.startsWith("specialties/")) {
+        output("  cat: " + args + ": Permission denied");
+      } else {
+        output("  cat: " + (args || "(no file)") + ": No such file");
+      }
+    },
+  },
+  cd: {
+    description: "Change directory",
+    handler: (_args, output) => output("  You cannot change directory"),
+  },
+  ssh: {
+    description: "SSH into a remote host",
+    handler: (args, output) => {
+      const targets = {
+        "monbuticloud@projects.local": "projects.html",
+        "monbuticloud@contact.local": "contact.html",
+      };
+      const page = targets[args.trim()];
+      if (page) {
+        output(`  Connecting to ${args.trim()}...`);
+        setTimeout(() => { window.location.href = page; }, 600);
+      } else {
+        output(`  ssh: connect to host ${args.split("@").pop() || args} port 22: Connection refused`);
+      }
+    },
+  },
+  clear: {
+    description: "Clear the terminal",
+    handler: (_args, output) => {
+      const history = document.getElementById("term-history");
+      history.innerHTML = "";
+    },
+  },
+  // TODO: add more commands here
+};
+
+/// ───────── Terminal Interactive Input ─────────
+/// Injected dependencies — no global coupling.
+
+function createTerminalInput(inject) {
+  const { inputEl, historyEl, bodyEl, commandMap } = inject;
+
+  function appendOutputLine(text) {
+    const line = document.createElement("div");
+    line.className = "term-line";
+    line.innerHTML = `<span class="output-line">${text}</span>`;
+    historyEl.appendChild(line);
+    bodyEl.scrollTop = bodyEl.scrollHeight;
+  }
+
+  let lastCommandTime = performance.now();
+
+  function appendCommandLine(text) {
+    const now = performance.now();
+    const elapsed = Math.round(now - lastCommandTime);
+    lastCommandTime = now;
+    const timing = elapsed < 1 ? "0ms" : elapsed + "ms";
+    // Powerline header — matches intro styling
+    appendPowerlineHeader(timing);
+    const line = document.createElement("div");
+    line.className = "term-line";
+    line.innerHTML = `<span class="prompt">&gt;</span> ${text}`;
+    historyEl.appendChild(line);
+    bodyEl.scrollTop = bodyEl.scrollHeight;
+  }
+
+  function handleCommand(raw) {
+    const trimmed = raw.trim();
+    if (!trimmed) return;
+
+    appendCommandLine(trimmed);
+
+    const [keyword, ...rest] = trimmed.split(/\s+/);
+    const entry = commandMap[keyword.toLowerCase()];
+
+    if (entry) {
+      entry.handler(rest.join(" "), appendOutputLine);
+    } else {
+      appendOutputLine(`zsh: command not found: ${keyword}`);
+    }
+  }
+
+  inputEl.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleCommand(inputEl.value);
+      inputEl.value = "";
+    }
+  });
+
+  return {
+    enable() {
+      inputEl.disabled = false;
+      inputEl.placeholder = "type a command…";
+      inputEl.focus();
+    },
+    disable() {
+      inputEl.disabled = true;
+      inputEl.placeholder = "waiting for intro…";
+    },
+  };
+}
+
+// Wire it up with injected refs
+const termControl = createTerminalInput({
+  inputEl: document.getElementById("term-input"),
+  historyEl: termHistory,
+  bodyEl: termBody,
+  commandMap: commands,
+});
 
 /// Square Grid — canvas-based generative pattern
 

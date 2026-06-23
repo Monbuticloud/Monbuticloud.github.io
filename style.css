@@ -94,6 +94,17 @@
   }
 }
 
+.term-bar-title {
+  margin-left: auto;
+  font-size: 0.7em;
+  color: rgba(255, 255, 255, 0.3);
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    "Courier New", monospace;
+  user-select: none;
+  white-space: nowrap;
+}
+
 .term-dot {
   width: 8px;
   height: 8px;
@@ -195,6 +206,55 @@
   50% {
     opacity: 0;
   }
+}
+
+/* ───────── Terminal Input Box ───────── */
+.term-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.4em;
+  background: #0d0d1a;
+  padding: 8px 14px;
+  border-top: 1px solid #2a2a3e;
+  flex-shrink: 0;
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    "Courier New", monospace;
+}
+
+.term-input-prompt {
+  color: var(--lime-cream-500);
+  font-weight: var(--weight-700);
+  font-size: clamp(0.7em, 1.6vw, 0.85em);
+  white-space: nowrap;
+  user-select: none;
+}
+
+.term-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--lime-cream-500);
+  font-family: inherit;
+  font-size: clamp(0.7em, 1.6vw, 0.85em);
+  caret-color: var(--lime-cream-500);
+  padding: 0;
+  line-height: 1.6;
+}
+
+.term-input::placeholder {
+  color: rgba(255, 255, 255, 0.18);
+  font-style: italic;
+}
+
+.term-input:focus {
+  outline: none;
+}
+
+.term-input:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
 }
 
 /* ───────── Powerline Path Segments ───────── */

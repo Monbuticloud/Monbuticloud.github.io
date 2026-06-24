@@ -36,15 +36,6 @@
     <link rel="stylesheet" href="common.css" />
     <link rel="stylesheet" href="style.css" />
 
-    <!-- Import Map -->
-    <script type="importmap">
-    {
-      "imports": {
-        "@opendisplay/epaper-dithering": "https://esm.sh/@opendisplay/epaper-dithering@5.0.6"
-      }
-    }
-    </script>
-
     <!-- Structured Data -->
     <script type="application/ld+json">
     {
@@ -74,7 +65,10 @@
       </section>
       <section class="image-split">
         <div>
-          <canvas id="dither-canvas"></canvas>
+          <picture>
+            <source srcset="assets/images/laptop-fullstack-optim_hd.avif" type="image/avif" />
+            <img src="assets/images/laptop-fullstack-optim.avif" alt="Laptop screen showing fullstack code with frontend and backend interfaces" />
+          </picture>
         </div>
         <div class="terminal-panel">
           <div class="term">
@@ -353,92 +347,5 @@
 
     <script src="common.js" defer></script>
     <script src="script.js" defer></script>
-    <script type="module">
-    import { ditherImage, ColorScheme, DitherMode } from "@opendisplay/epaper-dithering";
-
-    const canvas = document.getElementById("dither-canvas");
-    if (!canvas) throw "no canvas";
-
-    function drawStripes(ctx, w, h) {
-      ctx.save();
-      ctx.translate(w / 2, h / 2);
-      ctx.rotate(-Math.PI / 4);
-      ctx.fillStyle = "#0a0a1a";
-      ctx.fillRect(-w, -h, w * 2, h * 2);
-      ctx.fillStyle = "#1a5c8c";
-      for (let i = -600; i < 600; i += 80) ctx.fillRect(-600, i, 1200, 30);
-      ctx.restore();
-    }
-
-    function sizeCanvas(dpr) {
-      const rect = canvas.parentElement.getBoundingClientRect();
-      if (!rect.width || !rect.height) return null;
-      canvas.width = rect.width * dpr;
-      canvas.height = rect.height * dpr;
-      canvas.style.width = rect.width + "px";
-      canvas.style.height = rect.height + "px";
-      return rect;
-    }
-
-    function ditherAndDraw(img, ctx, w, h) {
-      const U = 4;
-      const sw = img.naturalWidth * U;
-      const sh = img.naturalHeight * U;
-      const off = document.createElement("canvas");
-      off.width = sw;
-      off.height = sh;
-      const oc = off.getContext("2d");
-      oc.imageSmoothingEnabled = false;
-      oc.drawImage(img, 0, 0, sw, sh);
-
-      try {
-        const src = oc.getImageData(0, 0, sw, sh);
-        const result = ditherImage(
-          { width: sw, height: sh, data: src.data },
-          ColorScheme.GRAYSCALE_4,
-          { mode: DitherMode.FLOYD_STEINBERG, serpentine: true }
-        );
-        const out = oc.createImageData(sw, sh);
-        const pal = result.palette;
-        for (let i = 0; i < result.indices.length; i++) {
-          const c = pal[result.indices[i]];
-          const o = i * 4;
-          out.data[o] = c.r;
-          out.data[o + 1] = c.g;
-          out.data[o + 2] = c.b;
-          out.data[o + 3] = 255;
-        }
-        oc.putImageData(out, 0, 0);
-      } catch (_) {}
-      ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(off, 0, 0, w, h);
-    }
-
-    const conn = navigator.connection;
-    const isSlow = conn && (conn.saveData || conn.effectiveType === "slow-2g" || conn.effectiveType === "2g" || conn.downlink < 0.5);
-
-    if (isSlow) {
-      const dpr = window.devicePixelRatio || 1;
-      const rect = sizeCanvas(dpr);
-      if (rect) drawStripes(canvas.getContext("2d"), rect.width, rect.height);
-    } else {
-      const dpr = window.devicePixelRatio || 1;
-      const ctx = canvas.getContext("2d");
-
-      let loaded = 0;
-      function load(src) {
-        const img = new Image();
-        img.onload = () => {
-          const rect = sizeCanvas(dpr);
-          if (!rect) return;
-          ditherAndDraw(img, ctx, rect.width, rect.height);
-          loaded++;
-          if (loaded === 1) load("assets/images/laptop-fullstack-optim.avif");
-        };
-        img.src = src;
-      }
-      load("assets/images/laptop-fullstack-optim_hd.avif");
-    }
-    </script>
   </body>
 </html>

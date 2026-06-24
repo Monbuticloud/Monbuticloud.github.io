@@ -489,3 +489,103 @@ function debounce(fn, ms) {
 let rafId = 0;
 initCanvas();
 window.addEventListener("resize", debounce(initCanvas, 150));
+
+/// ─── Dither Hero Image ───────────────────────────────────
+(function ditherHero() {
+  const canvas = document.getElementById("dither-canvas");
+  if (!canvas) return;
+
+  const palette = [0, 85, 170, 255]; // 4 grayscale levels
+
+  function floydSteinberg(data, w, h) {
+    const d = new Uint8ClampedArray(data);
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const i = (y * w + x) * 4;
+        const old = d[i];
+        let nearest = 0, minDist = Infinity;
+        for (let k = 0; k < palette.length; k++) {
+          const dist = Math.abs(old - palette[k]);
+          if (dist < minDist) { minDist = dist; nearest = palette[k]; }
+        }
+        const err = old - nearest;
+        d[i] = d[i + 1] = d[i + 2] = nearest;
+        // distribute error (Floyd-Steinberg weights)
+        if (x + 1 < w) {
+          const r = i + 4;
+          d[r] += err * 7 / 16; d[r + 1] = d[r + 2] = d[r];
+        }
+        if (y + 1 < h) {
+          if (x > 0) {
+            const bl = i + w * 4 - 4;
+            d[bl] += err * 3 / 16; d[bl + 1] = d[bl + 2] = d[bl];
+          }
+          const b = i + w * 4;
+          d[b] += err * 5 / 16; d[b + 1] = d[b + 2] = d[b];
+          if (x + 1 < w) {
+            const br = i + w * 4 + 4;
+            d[br] += err * 1 / 16; d[br + 1] = d[br + 2] = d[br];
+          }
+        }
+      }
+    }
+    return new ImageData(d, w, h);
+  }
+
+  function render() {
+    const img = new Image();
+    img.onload = function () {
+      const srcW = img.naturalWidth, srcH = img.naturalHeight;
+      if (!srcW || !srcH) return;
+      // dither at native res
+      const srcC = document.createElement("canvas");
+      srcC.width = srcW; srcC.height = srcH;
+      const srcCtx = srcC.getContext("2d");
+      srcCtx.imageSmoothingEnabled = false;
+      srcCtx.drawImage(img, 0, 0);
+      try {
+        const imageData = srcCtx.getImageData(0, 0, srcW, srcH);
+        const dithered = floydSteinberg(imageData.data, srcW, srcH);
+        srcCtx.putImageData(dithered, 0, 0);
+      } catch (_) {
+        // canvas tainted (file:// protocol) — skip dither, show raw
+      }
+      // scale to display size
+      const rect = canvas.parentElement.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      canvas.style.width = rect.width + "px";
+      canvas.style.height = rect.height + "px";
+      const ctx = canvas.getContext("2d");
+      ctx.scale(dpr, dpr);
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(srcC, 0, 0, rect.width, rect.height);
+    };
+    img.onerror = function () {
+      // fallback: bypass dither, draw raw image
+      const rect = canvas.parentElement.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      canvas.style.width = rect.width + "px";
+      canvas.style.height = rect.height + "px";
+      const ctx = canvas.getContext("2d");
+      ctx.scale(dpr, dpr);
+      ctx.imageSmoothingEnabled = false;
+      // draw the broken-image icon alternative
+      ctx.fillStyle = "#151525";
+      ctx.fillRect(0, 0, rect.width, rect.height);
+      ctx.fillStyle = "#555";
+      ctx.font = Math.min(rect.width, rect.height) * 0.1 + "px monospace";
+      ctx.textAlign = "center";
+      ctx.fillText("image load failed", rect.width / 2, rect.height / 2);
+    };
+    img.src = "assets/images/optim_main_4_gray.avif";
+  }
+
+  render();
+  window.addEventListener("resize", debounce(render, 200));
+})();

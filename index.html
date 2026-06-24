@@ -21,13 +21,13 @@
     <meta property="og:url" content="https://monbuticloud.github.io/" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Monbuticloud's Hub" />
-    <meta property="og:image" content="https://monbuticloud.github.io/assets/images/optim_main_4_gray.avif" />
+    <meta property="og:image" content="https://monbuticloud.github.io/assets/images/laptop-fullstack-optim.avif" />
 
     <!-- Twitter Cards -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Monbuticloud's Hub — Portfolio &amp; Projects" />
     <meta name="twitter:description" content="Monbuticloud's personal portfolio — fullstack development specializing in Rust, Python, and backend systems." />
-    <meta name="twitter:image" content="https://monbuticloud.github.io/assets/images/optim_main_4_gray.avif" />
+    <meta name="twitter:image" content="https://monbuticloud.github.io/assets/images/laptop-fullstack-optim.avif" />
 
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
@@ -357,13 +357,32 @@
     import { ditherImage, ColorScheme, DitherMode } from "@opendisplay/epaper-dithering";
 
     const canvas = document.getElementById("dither-canvas");
-    const img = new Image();
-    img.src = "assets/images/optim_main_4_gray.avif";
+    if (!canvas) throw "no canvas";
 
-    function render() {
-      if (!canvas || !img.complete) return;
+    function drawStripes(ctx, w, h) {
+      // diagonal blue-on-dark stripes — tiny footprint, no network
+      ctx.save();
+      ctx.translate(w / 2, h / 2);
+      ctx.rotate(-Math.PI / 4);
+      ctx.fillStyle = "#0a0a1a";
+      ctx.fillRect(-w, -h, w * 2, h * 2);
+      ctx.fillStyle = "#1a5c8c";
+      for (let i = -600; i < 600; i += 80) ctx.fillRect(-600, i, 1200, 30);
+      ctx.restore();
+    }
+
+    const conn = navigator.connection;
+    const isSlow =
+      conn &&
+      (conn.saveData ||
+        conn.effectiveType === "slow-2g" ||
+        conn.effectiveType === "2g" ||
+        conn.downlink < 0.5);
+
+    if (isSlow) {
+      // instant placeholder — no image load
       const rect = canvas.parentElement.getBoundingClientRect();
-      if (!rect.width || !rect.height) return;
+      if (!rect.width || !rect.height) throw "no size";
       const dpr = window.devicePixelRatio || 1;
       canvas.width = rect.width * dpr;
       canvas.height = rect.height * dpr;
@@ -372,45 +391,59 @@
       const ctx = canvas.getContext("2d");
       ctx.scale(dpr, dpr);
       ctx.imageSmoothingEnabled = false;
+      drawStripes(ctx, rect.width, rect.height);
+    } else {
+      const img = new Image();
+      img.src = "assets/images/laptop-fullstack-optim_hd.avif";
 
-      // upsample 4× then dither for finer error diffusion
-      const U = 4;
-      const sw = img.naturalWidth * U;
-      const sh = img.naturalHeight * U;
+      function render() {
+        if (!img.complete) return;
+        const rect = canvas.parentElement.getBoundingClientRect();
+        if (!rect.width || !rect.height) return;
+        const dpr = window.devicePixelRatio || 1;
+        canvas.width = rect.width * dpr;
+        canvas.height = rect.height * dpr;
+        canvas.style.width = rect.width + "px";
+        canvas.style.height = rect.height + "px";
+        const ctx = canvas.getContext("2d");
+        ctx.scale(dpr, dpr);
+        ctx.imageSmoothingEnabled = false;
 
-      const off = document.createElement("canvas");
-      off.width = sw;
-      off.height = sh;
-      const offCtx = off.getContext("2d");
-      offCtx.imageSmoothingEnabled = false;
-      offCtx.drawImage(img, 0, 0, sw, sh);
+        const U = 4;
+        const sw = img.naturalWidth * U;
+        const sh = img.naturalHeight * U;
+        const off = document.createElement("canvas");
+        off.width = sw;
+        off.height = sh;
+        const offCtx = off.getContext("2d");
+        offCtx.imageSmoothingEnabled = false;
+        offCtx.drawImage(img, 0, 0, sw, sh);
 
-      try {
-        const src = offCtx.getImageData(0, 0, sw, sh);
-        const result = ditherImage(
-          { width: sw, height: sh, data: src.data },
-          ColorScheme.GRAYSCALE_4,
-          { mode: DitherMode.FLOYD_STEINBERG, serpentine: true }
-        );
-        const out = offCtx.createImageData(sw, sh);
-        const pal = result.palette;
-        for (let i = 0; i < result.indices.length; i++) {
-          const c = pal[result.indices[i]];
-          const o = i * 4;
-          out.data[o] = c.r;
-          out.data[o + 1] = c.g;
-          out.data[o + 2] = c.b;
-          out.data[o + 3] = 255;
-        }
-        offCtx.putImageData(out, 0, 0);
-      } catch (_) {}
+        try {
+          const src = offCtx.getImageData(0, 0, sw, sh);
+          const result = ditherImage(
+            { width: sw, height: sh, data: src.data },
+            ColorScheme.GRAYSCALE_4,
+            { mode: DitherMode.FLOYD_STEINBERG, serpentine: true }
+          );
+          const out = offCtx.createImageData(sw, sh);
+          const pal = result.palette;
+          for (let i = 0; i < result.indices.length; i++) {
+            const c = pal[result.indices[i]];
+            const o = i * 4;
+            out.data[o] = c.r;
+            out.data[o + 1] = c.g;
+            out.data[o + 2] = c.b;
+            out.data[o + 3] = 255;
+          }
+          offCtx.putImageData(out, 0, 0);
+        } catch (_) {}
+        ctx.drawImage(off, 0, 0, rect.width, rect.height);
+      }
 
-      // draw dithered high-res result to visible canvas
-      ctx.drawImage(off, 0, 0, rect.width, rect.height);
+      img.onload = render;
+      window.addEventListener("resize", () => requestAnimationFrame(render));
     }
-
-    if (canvas) img.onload = render;
-    window.addEventListener("resize", () => requestAnimationFrame(render));
     </script>
   </body>
 </html>

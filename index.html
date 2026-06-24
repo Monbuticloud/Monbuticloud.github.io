@@ -64,11 +64,12 @@
         </h1>
       </section>
       <section class="image-split">
-        <div>
-          <picture>
+        <div id="hero-container">
+          <picture id="hero-picture">
             <source srcset="assets/images/laptop-fullstack-optim_hd.avif" type="image/avif" />
             <img src="assets/images/laptop-fullstack-optim.avif" alt="Laptop screen showing fullstack code with frontend and backend interfaces" />
           </picture>
+          <canvas id="hero-stripes" style="display:none"></canvas>
         </div>
         <div class="terminal-panel">
           <div class="term">
@@ -347,5 +348,33 @@
 
     <script src="common.js" defer></script>
     <script src="script.js" defer></script>
+    <script>
+    (function(){
+      const c = navigator.connection;
+      if (c && (c.saveData || c.effectiveType === "slow-2g" || c.effectiveType === "2g" || c.downlink < 0.5)) {
+        const pic = document.getElementById("hero-picture");
+        const can = document.getElementById("hero-stripes");
+        if (!pic || !can) return;
+        pic.style.display = "none";
+        can.style.display = "";
+        const rect = can.parentElement.getBoundingClientRect();
+        const dpr = window.devicePixelRatio || 1;
+        can.width = rect.width * dpr;
+        can.height = rect.height * dpr;
+        can.style.width = rect.width + "px";
+        can.style.height = rect.height + "px";
+        const ctx = can.getContext("2d");
+        ctx.scale(dpr, dpr);
+        ctx.save();
+        ctx.translate(rect.width / 2, rect.height / 2);
+        ctx.rotate(-Math.PI / 4);
+        ctx.fillStyle = "#0a0a1a";
+        ctx.fillRect(-rect.width, -rect.height, rect.width * 2, rect.height * 2);
+        ctx.fillStyle = "#1a5c8c";
+        for (let i = -600; i < 600; i += 80) ctx.fillRect(-600, i, 1200, 30);
+        ctx.restore();
+      }
+    })();
+    </script>
   </body>
 </html>

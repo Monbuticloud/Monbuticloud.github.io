@@ -535,22 +535,9 @@ window.addEventListener("resize", debounce(initCanvas, 150));
   function render() {
     const img = new Image();
     img.onload = function () {
-      const srcW = img.naturalWidth, srcH = img.naturalHeight;
-      if (!srcW || !srcH) return;
-      // dither at native res
-      const srcC = document.createElement("canvas");
-      srcC.width = srcW; srcC.height = srcH;
-      const srcCtx = srcC.getContext("2d");
-      srcCtx.imageSmoothingEnabled = false;
-      srcCtx.drawImage(img, 0, 0);
-      try {
-        const imageData = srcCtx.getImageData(0, 0, srcW, srcH);
-        const dithered = floydSteinberg(imageData.data, srcW, srcH);
-        srcCtx.putImageData(dithered, 0, 0);
-      } catch (_) {
-        // canvas tainted (file:// protocol) — skip dither, show raw
-      }
-      // scale to display size
+      const sw = img.naturalWidth, sh = img.naturalHeight;
+      if (!sw || !sh) return;
+      // size visible canvas to container
       const rect = canvas.parentElement.getBoundingClientRect();
       if (!rect.width || !rect.height) return;
       const dpr = window.devicePixelRatio || 1;
@@ -561,10 +548,48 @@ window.addEventListener("resize", debounce(initCanvas, 150));
       const ctx = canvas.getContext("2d");
       ctx.scale(dpr, dpr);
       ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(srcC, 0, 0, rect.width, rect.height);
+      // draw raw image scaled up
+      ctx.drawImage(img, 0, 0, rect.width, rect.height);
+      // try dither on the visible canvas pixels
+      try {
+        const w = Math.round(rect.width), h = Math.round(rect.height);
+        const data = ctx.getImageData(0, 0, w, h);
+        // aggressively dither to black/white to make it obvious
+        const P = [0, 255];
+        const px = data.data;
+        for (let y = 0; y < h; y++) {
+          for (let x = 0; x < w; x++) {
+            const i = (y * w + x) << 2;
+            const gray = (px[i] + px[i+1] + px[i+2]) / 3 | 0;
+            let nearest = gray < 128 ? 0 : 255;
+            const err = gray - nearest;
+            px[i] = px[i+1] = px[i+2] = nearest;
+            if (x + 1 < w) {
+              const ri = i + 4;
+              px[ri] += err * 7/16 | 0; px[ri+1] = px[ri]; px[ri+2] = px[ri];
+            }
+            if (y + 1 < h) {
+              if (x > 0) {
+                const bli = i + (w << 2) - 4;
+                px[bli] += err * 3/16 | 0; px[bli+1] = px[bli]; px[bli+2] = px[bli];
+              }
+              const bi = i + (w << 2);
+              px[bi] += err * 5/16 | 0; px[bi+1] = px[bi]; px[bi+2] = px[bi];
+              if (x + 1 < w) {
+                const bri = i + (w << 2) + 4;
+                px[bri] += err * 1/16 | 0; px[bri+1] = px[bri]; px[bri+2] = px[bri];
+              }
+            }
+          }
+        }
+        ctx.putImageData(data, 0, 0);
+      } catch (_) {
+        // dither skipped — canvas tainted
+        ctx.fillStyle = "#f00";
+        ctx.fillRect(4, 4, 40, 20);
+      }
     };
     img.onerror = function () {
-      // fallback: bypass dither, draw raw image
       const rect = canvas.parentElement.getBoundingClientRect();
       if (!rect.width || !rect.height) return;
       const dpr = window.devicePixelRatio || 1;
@@ -574,8 +599,6 @@ window.addEventListener("resize", debounce(initCanvas, 150));
       canvas.style.height = rect.height + "px";
       const ctx = canvas.getContext("2d");
       ctx.scale(dpr, dpr);
-      ctx.imageSmoothingEnabled = false;
-      // draw the broken-image icon alternative
       ctx.fillStyle = "#151525";
       ctx.fillRect(0, 0, rect.width, rect.height);
       ctx.fillStyle = "#555";

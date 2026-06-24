@@ -65,10 +65,7 @@
       </section>
       <section class="image-split">
         <div id="hero-container">
-          <picture id="hero-picture">
-            <source srcset="assets/images/laptop-fullstack-optim_hd.avif" type="image/avif" />
-            <img src="assets/images/laptop-fullstack-optim.avif" alt="Laptop screen showing fullstack code with frontend and backend interfaces" />
-          </picture>
+          <img id="hero-img" src="assets/images/laptop-fullstack-optim_hd.avif" alt="Laptop screen showing fullstack code with frontend and backend interfaces" />
           <svg id="hero-stripes" style="display:none;width:100%;height:100%" viewBox="0 0 100 100" preserveAspectRatio="none">
             <defs>
               <pattern id="stripe" patternUnits="userSpaceOnUse" width="100" height="100" patternTransform="rotate(-45)">
@@ -358,11 +355,21 @@
     <script src="script.js" defer></script>
     <script>
     (function(){
-      const c = navigator.connection;
+      var img = document.getElementById("hero-img");
+      var svg = document.getElementById("hero-stripes");
+      if (!img || !svg) return;
+
+      var c = navigator.connection;
       if (c && (c.saveData || c.effectiveType === "slow-2g" || c.effectiveType === "2g" || c.downlink < 0.5)) {
-        document.getElementById("hero-picture").style.display = "none";
-        document.getElementById("hero-stripes").style.display = "";
+        img.style.display = "none";
+        svg.style.display = "";
+        return;
       }
+
+      // progressive: HD is already src, preload full in background
+      var full = new Image();
+      full.onload = function() { img.src = full.src };
+      full.src = "assets/images/laptop-fullstack-optim.avif";
     })();
     </script>
   </body>

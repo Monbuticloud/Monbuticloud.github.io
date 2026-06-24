@@ -359,17 +359,26 @@
       var svg = document.getElementById("hero-stripes");
       if (!img || !svg) return;
 
-      var c = navigator.connection;
-      if (c && (c.saveData || c.downlink < 1 || c.effectiveType === "slow-2g" || c.effectiveType === "2g" || c.effectiveType === "3g" || c.effectiveType === "4g")) {
-        img.style.display = "none";
-        svg.style.display = "";
-        return;
+      function isSlow() {
+        var c = navigator.connection;
+        return c && (c.saveData || c.downlink < 1 || c.type === "cellular" || c.effectiveType === "slow-2g" || c.effectiveType === "2g" || c.effectiveType === "3g");
       }
 
-      // progressive: HD is already src, preload full in background
-      var full = new Image();
-      full.onload = function() { img.src = full.src };
-      full.src = "assets/images/laptop-fullstack-optim.avif";
+      function apply() {
+        if (isSlow()) {
+          img.style.display = "none";
+          svg.style.display = "";
+        } else if (img.style.display !== "none") {
+          // progressive: HD is already src, preload full in background
+          var full = new Image();
+          full.onload = function() { img.src = full.src };
+          full.src = "assets/images/laptop-fullstack-optim.avif";
+        }
+      }
+
+      apply();
+      var c = navigator.connection;
+      if (c) c.addEventListener("change", apply);
     })();
     </script>
   </body>

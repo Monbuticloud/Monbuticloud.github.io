@@ -56,6 +56,11 @@
 
       transition: transform 0.4s ease-in-out;
     }
+
+    #hero-stripes {
+      position: absolute;
+      inset: 0;
+    }
   }
 
   .terminal-panel {

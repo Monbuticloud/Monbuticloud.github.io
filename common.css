@@ -282,6 +282,14 @@ section {
   animation: slide-in-right 0.5s cubic-bezier(0.4, 0, 0.2, 1) both;
 }
 
+.fa-icon {
+  display: inline-block;
+  fill: currentColor;
+  vertical-align: middle;
+  width: 1em;
+  height: 1em;
+}
+
 /* ───────── Navigation ───────── */
 nav {
   view-transition-name: nav;
@@ -328,8 +336,9 @@ nav {
       gap: 0.4em;
       padding: 0.5em 1em;
 
-      i {
-        font-size: 0.9em;
+      .fa-icon {
+        width: 0.9em;
+        height: 0.9em;
       }
     }
   }

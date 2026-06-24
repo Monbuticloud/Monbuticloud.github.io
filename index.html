@@ -360,7 +360,7 @@
       if (!img || !svg) return;
 
       var c = navigator.connection;
-      if (c && (c.saveData || c.effectiveType === "slow-2g" || c.effectiveType === "2g" || c.downlink < 0.5)) {
+      if (c && (c.saveData || c.downlink < 1 || c.effectiveType === "slow-2g" || c.effectiveType === "2g" || c.effectiveType === "3g" || c.effectiveType === "4g")) {
         img.style.display = "none";
         svg.style.display = "";
         return;

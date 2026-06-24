@@ -372,18 +372,27 @@
       const ctx = canvas.getContext("2d");
       ctx.scale(dpr, dpr);
       ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(img, 0, 0, rect.width, rect.height);
+
+      // upsample 4× then dither for finer error diffusion
+      const U = 4;
+      const sw = img.naturalWidth * U;
+      const sh = img.naturalHeight * U;
+
+      const off = document.createElement("canvas");
+      off.width = sw;
+      off.height = sh;
+      const offCtx = off.getContext("2d");
+      offCtx.imageSmoothingEnabled = false;
+      offCtx.drawImage(img, 0, 0, sw, sh);
 
       try {
-        const w = Math.round(rect.width);
-        const h = Math.round(rect.height);
-        const src = ctx.getImageData(0, 0, w, h);
+        const src = offCtx.getImageData(0, 0, sw, sh);
         const result = ditherImage(
-          { width: w, height: h, data: src.data },
+          { width: sw, height: sh, data: src.data },
           ColorScheme.GRAYSCALE_4,
           { mode: DitherMode.FLOYD_STEINBERG, serpentine: true }
         );
-        const out = ctx.createImageData(w, h);
+        const out = offCtx.createImageData(sw, sh);
         const pal = result.palette;
         for (let i = 0; i < result.indices.length; i++) {
           const c = pal[result.indices[i]];
@@ -393,10 +402,11 @@
           out.data[o + 2] = c.b;
           out.data[o + 3] = 255;
         }
-        ctx.putImageData(out, 0, 0);
-      } catch (_) {
-        // fallback: raw image already drawn
-      }
+        offCtx.putImageData(out, 0, 0);
+      } catch (_) {}
+
+      // draw dithered high-res result to visible canvas
+      ctx.drawImage(off, 0, 0, rect.width, rect.height);
     }
 
     if (canvas) img.onload = render;

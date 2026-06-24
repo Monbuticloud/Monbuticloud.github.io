@@ -36,6 +36,15 @@
     <link rel="stylesheet" href="common.css" />
     <link rel="stylesheet" href="style.css" />
 
+    <!-- Import Map -->
+    <script type="importmap">
+    {
+      "imports": {
+        "@opendisplay/epaper-dithering": "https://esm.sh/@opendisplay/epaper-dithering@5.0.6"
+      }
+    }
+    </script>
+
     <!-- Structured Data -->
     <script type="application/ld+json">
     {
@@ -344,5 +353,54 @@
 
     <script src="common.js" defer></script>
     <script src="script.js" defer></script>
+    <script type="module">
+    import { ditherImage, ColorScheme, DitherMode } from "@opendisplay/epaper-dithering";
+
+    const canvas = document.getElementById("dither-canvas");
+    const img = new Image();
+    img.src = "assets/images/optim_main_4_gray.avif";
+
+    function render() {
+      if (!canvas || !img.complete) return;
+      const rect = canvas.parentElement.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      canvas.style.width = rect.width + "px";
+      canvas.style.height = rect.height + "px";
+      const ctx = canvas.getContext("2d");
+      ctx.scale(dpr, dpr);
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(img, 0, 0, rect.width, rect.height);
+
+      try {
+        const w = Math.round(rect.width);
+        const h = Math.round(rect.height);
+        const src = ctx.getImageData(0, 0, w, h);
+        const result = ditherImage(
+          { width: w, height: h, data: src.data },
+          ColorScheme.GRAYSCALE_4,
+          { mode: DitherMode.FLOYD_STEINBERG, serpentine: true }
+        );
+        const out = ctx.createImageData(w, h);
+        const pal = result.palette;
+        for (let i = 0; i < result.indices.length; i++) {
+          const c = pal[result.indices[i]];
+          const o = i * 4;
+          out.data[o] = c.r;
+          out.data[o + 1] = c.g;
+          out.data[o + 2] = c.b;
+          out.data[o + 3] = 255;
+        }
+        ctx.putImageData(out, 0, 0);
+      } catch (_) {
+        // fallback: raw image already drawn
+      }
+    }
+
+    if (canvas) img.onload = render;
+    window.addEventListener("resize", () => requestAnimationFrame(render));
+    </script>
   </body>
 </html>

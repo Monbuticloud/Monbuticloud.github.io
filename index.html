@@ -361,7 +361,8 @@
 
       function isSlow() {
         var c = navigator.connection;
-        return c && (c.saveData || c.downlink < 1 || c.type === "cellular" || c.effectiveType === "slow-2g" || c.effectiveType === "2g" || c.effectiveType === "3g");
+        var reduce = window.matchMedia("(prefers-reduced-data: reduce)");
+        return (c && (c.saveData || c.downlink < 1 || c.type === "cellular" || c.effectiveType === "slow-2g" || c.effectiveType === "2g" || c.effectiveType === "3g")) || reduce.matches;
       }
 
       function apply() {

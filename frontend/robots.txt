@@ -1,4 +1,0 @@
-User-agent: *
-Allow: /
-
-Sitemap: https://monbuticloud.github.io/sitemap.xml

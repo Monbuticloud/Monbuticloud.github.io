@@ -1,0 +1,8 @@
+# Rust toolchain configuration
+# Docs: https://rust-lang.github.io/rustup/overrides.html#toolchain-file
+
+[toolchain]
+channel = "stable"
+edition = "2024"
+components = ["rustc", "cargo", "clippy", "rustfmt", "rust-analyzer"]
+targets = ["aarch64-apple-darwin", "x86_64-unknown-linux-gnu"]

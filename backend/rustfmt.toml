@@ -1,0 +1,20 @@
+# Rustfmt configuration for backend
+# Docs: https://rust-lang.github.io/rustfmt/
+
+max_width = 120
+tab_spaces = 4
+newline_style = "Unix"
+use_small_heuristics = "Default"
+edition = "2024"
+
+# Imports
+imports_granularity = "Crate"
+reorder_imports = true
+reorder_modules = true
+
+# Consistency
+trailing_semicolon = true
+trailing_comma = "Vertical"
+match_block_trailing_comma = true
+blank_lines_lower_bound = 1
+blank_lines_upper_bound = 2

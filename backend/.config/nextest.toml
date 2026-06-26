@@ -1,0 +1,28 @@
+# Nextest test runner configuration
+# Docs: https://nexte.st/book/configuration.html
+
+[profile.default]
+# Run tests in parallel (default: number of CPUs)
+threads = 4
+
+# Slow test threshold (seconds)
+slow-timeout = { period = "60s", grace-period = "30s", terminate-after = 2 }
+
+# Retry failed tests
+retries = { backoff = "fixed", count = 2, delay = "1s" }
+
+# Failure output
+failure-output = "immediate"
+
+# Test status display
+display-output = "pass"
+
+# Cancel test run on first failure
+fail-fast = false
+
+[profile.ci]
+# CI profile — stricter, no retries
+threads = 8
+retries = 0
+slow-timeout = { period = "120s", grace-period = "30s" }
+fail-fast = true

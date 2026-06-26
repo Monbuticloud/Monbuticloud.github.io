@@ -1,0 +1,20 @@
+# Clippy configuration for backend
+# Docs: https://doc.rust-lang.org/clippy/configuration.html
+
+# Disallow unsafe code entirely
+disallowed-macros = [
+    "unwrap",
+    "expect",
+]
+allow-unwrap-in-tests = true
+
+# Complexity thresholds
+cognitive-complexity-threshold = 15
+too-many-arguments-threshold = 8
+too-many-lines-threshold = 200
+
+# Allow list
+allow = [
+    "clippy::module_name_repetitions",
+    "clippy::struct_excessive_bools",
+]

@@ -1,0 +1,24 @@
+# Taplo TOML formatter configuration
+# Docs: https://taplo.tamasfe.dev/configuration/
+
+[formatting]
+# Column width for tables
+column_width = 120
+
+# Indentation
+indent_string = "    "
+reorder_keys = true
+reorder_arrays = true
+
+# Trailing newline
+trailing_newline = true
+
+# Align consecutive entries
+align_entries = false
+
+# Compact arrays
+compact_arrays = true
+compact_inline_tables = true
+
+# Allowed blank lines
+allowed_blank_lines = 2

@@ -1,0 +1,33 @@
+# Cargo configuration
+# Docs: https://doc.rust-lang.org/cargo/reference/config.html
+
+[build]
+# Use all available CPUs for parallel builds
+jobs = 0
+# Optimize dev builds for less iteration time
+incremental = true
+# Target directory
+target-dir = "target"
+
+[profile.dev]
+# Faster dev compiles
+opt-level = 0
+debug = true
+
+[profile.release]
+# Production optimizations
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+debug = false
+strip = "symbols"
+panic = "abort"
+
+[alias]
+# Common workflow aliases
+check-all = "check --all-targets --all-features"
+build-rel = "build --release"
+test-all = "test --all-targets"
+clippy-all = "clippy --all-targets --all-features -- -D warnings"
+fmt-check = "fmt --check"
+clean-all = "clean"

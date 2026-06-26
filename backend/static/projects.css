@@ -1,0 +1,48 @@
+/* ───────── Projects Section ───────── */
+#projects {
+  padding: 6em 1.5em 3em;
+  max-width: 1100px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+#projects h2 {
+  font-size: 2em;
+  font-weight: var(--weight-700);
+  text-align: center;
+  margin-bottom: 1em;
+}
+
+.projects-subtitle {
+  text-align: center;
+  color: var(--rosy-taupe-700);
+  margin-bottom: 2em;
+}
+
+.project-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1.5em;
+}
+
+.project-card {
+  background: rgba(255, 255, 255, 0.45);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 3px;
+  padding: 1.2em 1.4em;
+}
+
+.project-name {
+  font-weight: var(--weight-700);
+  font-size: 1.1em;
+  color: var(--wine-plum-500);
+  margin-bottom: 0.5em;
+}
+
+.project-desc {
+  font-size: 0.85em;
+  color: var(--rosy-taupe-700);
+  line-height: 1.5;
+}

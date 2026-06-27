@@ -11,7 +11,8 @@ async fn main() {
 
     let app = Router::new().route("/", get(handler));
 
-    println!("listening on {addr}");
+    // eprintln goes to stderr which is unbuffered on musl
+    eprintln!("listening on {addr}");
 
     let listener = tokio::net::TcpListener::bind(addr)
         .await

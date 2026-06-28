@@ -1,8 +1,8 @@
 # Build stage
 FROM rust:bullseye AS builder
 
-# Install musl tools (provides musl-gcc linker for fully static binaries)
-RUN apt-get update && apt-get install -y musl-tools && rm -rf /var/lib/apt/lists/*
+# Install musl tools (musl-gcc linker) and UPX (executable compressor)
+RUN apt-get update && apt-get install -y musl-tools upx-ucl && rm -rf /var/lib/apt/lists/*
 
 # Detect native architecture
 RUN ARCH=$(uname -m) && \
@@ -32,7 +32,8 @@ RUN TARGET=$(cat /target.txt) && \
     rm -f "target/$TARGET/release/backend" && \
     rm -rf "target/$TARGET/release/.fingerprint/backend-"* && \
     cargo build --release --target "$TARGET" && \
-    cp "target/$TARGET/release/backend" /backend
+    cp "target/$TARGET/release/backend" /backend && \
+    upx-ucl --best /backend
 
 # ── Final run stage (completely empty) ──
 FROM scratch AS runner

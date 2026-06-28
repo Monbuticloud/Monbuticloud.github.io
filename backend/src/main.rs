@@ -1,5 +1,6 @@
 use axum::{response::Html, routing::get, Router};
 use std::env;
+use std::io::{stdout, Write};
 use std::net::SocketAddr;
 
 #[tokio::main]
@@ -11,8 +12,8 @@ async fn main() {
 
     let app = Router::new().route("/", get(handler));
 
-    // eprintln goes to stderr which is unbuffered on musl
-    eprintln!("listening on {addr}");
+    println!("listening on {addr}");
+    stdout().flush().ok();
 
     let listener = tokio::net::TcpListener::bind(addr)
         .await

@@ -1,8 +1,8 @@
 # Build stage
-FROM rust:bullseye AS builder
+FROM rust:alpine AS builder
 
-# Install musl tools (musl-gcc linker) and UPX (executable compressor)
-RUN apt-get update && apt-get install -y musl-tools upx-ucl && rm -rf /var/lib/apt/lists/*
+# Install UPX (executable compressor). Alpine already ships musl natively.
+RUN apk add --no-cache upx
 
 # Detect native architecture
 RUN ARCH=$(uname -m) && \
@@ -33,7 +33,7 @@ RUN TARGET=$(cat /target.txt) && \
     rm -rf "target/$TARGET/release/.fingerprint/backend-"* && \
     cargo build --release --target "$TARGET" && \
     cp "target/$TARGET/release/backend" /backend && \
-    upx-ucl --best /backend
+    upx --best --lzma /backend
 
 # ── Final run stage (completely empty) ──
 FROM scratch AS runner
@@ -41,8 +41,8 @@ FROM scratch AS runner
 # Copy the fully static binary
 COPY --from=builder /backend /backend
 
-# Copy CA certificates if your app makes outbound HTTPS/TLS calls
-COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+# Add CA certificates here if your app makes outbound HTTPS/TLS calls:
+# RUN apk add --no-cache ca-certificates && cp /etc/ssl/certs/ca-certificates.crt /
 
 EXPOSE 8000
 CMD ["/backend"]

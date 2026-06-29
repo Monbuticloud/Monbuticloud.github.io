@@ -1,29 +1,39 @@
-use axum::{response::Html, routing::get, Router};
+use axum::http::StatusCode;
+use axum::{Router, response::Html, routing::get};
 use std::env;
-use std::io::{stdout, Write};
+use std::io::{Write, stdout};
 use std::net::SocketAddr;
+use tokio::runtime::Builder;
 
-#[tokio::main]
-async fn main() {
-    let port = env::var("PORT").unwrap_or_else(|_| "8000".to_string());
-    let addr: SocketAddr = format!("0.0.0.0:{port}")
-        .parse()
-        .expect("Invalid socket address");
+fn main() {
+    let rt = Builder::new_multi_thread()
+        .enable_all() // Enables I/O, time, etc.
+        .max_blocking_threads(2048)
+        .build()
+        .expect("Failed to create Tokio runtime");
 
-    let app = Router::new().route("/", get(handler));
+    // 2. Block on the async main logic
+    rt.block_on(async {
+        let port = env::var("PORT").unwrap_or_else(|_| "8000".to_string());
+        let addr: SocketAddr = format!("0.0.0.0:{port}").parse().expect("Invalid socket address");
 
-    println!("listening on {addr}");
-    stdout().flush().ok();
+        let app = Router::new().route("/", get(get_index_html));
 
-    let listener = tokio::net::TcpListener::bind(addr)
-        .await
-        .expect("Failed to bind");
+        println!("listening on {addr}");
+        stdout().flush().ok();
 
-    axum::serve(listener, app)
-        .await
-        .expect("Server error");
+        let listener = tokio::net::TcpListener::bind(addr).await.expect("Failed to bind");
+
+        axum::serve(listener, app).await.expect("Server error");
+    });
 }
 
-async fn handler() -> Html<&'static str> {
-    Html("<h1>Hello from Koyeb + Axum!</h1>")
+async fn get_index_html() -> (StatusCode, Html<String>) {
+    match tokio::fs::read_to_string("static/index.html").await {
+        Ok(contents) => (StatusCode::OK, Html(contents)),
+        Err(_) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Html("<h1>Internal Server Error</h1>".to_string()),
+        ),
+    }
 }

@@ -5,8 +5,10 @@ edition = "2024"
 license = "AGPL-3.0-only"
 
 [dependencies]
-axum = "0.8"
+axum = "0.8.9"
 tokio = { version = "1", features = ["full"] }
+tower-http = { version = "0.7.0", features = ["fs"] }
+mime = "0.3"
 
 [profile.dev]
 opt-level = 0

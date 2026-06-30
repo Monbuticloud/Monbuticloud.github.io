@@ -28,6 +28,7 @@ RUN rm -rf src
 # cargo to re-link the real binary. All compiled dependencies
 # are preserved in the cache.
 COPY src/ src/
+COPY static/*.html static/*.css static/*.js static/assets/icons.svg static/assets/images/laptop-fullstack-optim.avif static/assets/images/laptop-fullstack-optim_hd.avif /static/
 RUN TARGET=$(cat /target.txt) && \
     rm -f "target/$TARGET/release/backend" && \
     rm -rf "target/$TARGET/release/.fingerprint/backend-"* && \
@@ -40,6 +41,7 @@ FROM scratch AS runner
 
 # Copy the fully static binary
 COPY --from=builder /backend /backend
+COPY --from=builder /static static/
 
 # Add CA certificates here if your app makes outbound HTTPS/TLS calls:
 # RUN apk add --no-cache ca-certificates && cp /etc/ssl/certs/ca-certificates.crt /

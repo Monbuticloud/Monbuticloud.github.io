@@ -2,3 +2,6 @@
 
 # Rust / Cargo
 backend/target/
+
+# Nginx
+backend/nginx/certs/

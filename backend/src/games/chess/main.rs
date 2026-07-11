@@ -151,6 +151,7 @@ struct Board {
     fullmove_number: u16,
     wk_sq: u8, // square of white king
     bk_sq: u8, // square of black king
+    hash: u64, // Zobrist hash (incremental for O(1) TT probes)
 }
 
 impl Board {
@@ -165,6 +166,7 @@ impl Board {
             fullmove_number: 1,
             wk_sq: 4,  // e1
             bk_sq: 60, // e8
+            hash: 0,
         }
     }
 
@@ -305,6 +307,8 @@ fn parse_fen(fen: &str) -> Result<Board, &'static str> {
 
         board.fullmove_number = parts[5].parse().unwrap_or(1);
     }
+
+    board.hash = ZOBRIST.hash(&board);
 
     Ok(board)
 }
@@ -869,6 +873,7 @@ struct MoveUndo {
     ep_square: i8,
     castling_rights: u8,
     halfmove_clock: u16,
+    hash: u64,
 }
 
 fn make_move(board: &mut Board, mv: Move) -> MoveUndo {
@@ -885,11 +890,35 @@ fn make_move(board: &mut Board, mv: Move) -> MoveUndo {
 
     let saved_halfmove_clock = board.halfmove_clock;
 
+    let saved_hash = board.hash;
+
     let moving_piece = board.board[mv.from as usize];
 
     let is_king = moving_piece == (if current_side == Color::White { W_KING } else { B_KING });
 
     let is_rook = !is_king && moving_piece.abs() == 4;
+
+    // ── Incremental Zobrist hash: XOR out old state ──
+
+    // Side to move toggle (XOR removes if present, adds if absent)
+    board.hash ^= ZOBRIST.keys[768];
+
+    // Old en passant file
+    if saved_ep_square != -1 {
+
+        board.hash ^= ZOBRIST.keys[773 + (saved_ep_square as usize & 7)];
+    }
+
+    // Moving piece leaves its from square
+    board.hash ^= ZOBRIST.keys[zobrist_key(moving_piece, mv.from)];
+
+    // Captured piece removed from to square (if any)
+    if captured != EMPTY {
+
+        board.hash ^= ZOBRIST.keys[zobrist_key(captured, mv.to)];
+    }
+
+    // ── Board changes ──
 
     // Move piece
     board.board[mv.to as usize] = moving_piece;
@@ -915,9 +944,7 @@ fn make_move(board: &mut Board, mv: Move) -> MoveUndo {
     }
 
     // En passant capture
-    if (mv.to as i8) == board.en_passant_square
-        && board.board[mv.to as usize] == (if current_side == Color::White { W_PAWN } else { B_PAWN })
-    {
+    if (mv.to as i8) == saved_ep_square && moving_piece.abs() == 1 {
 
         let captured_pawn_square = if current_side == Color::White {
 
@@ -1036,15 +1063,91 @@ fn make_move(board: &mut Board, mv: Move) -> MoveUndo {
         board.fullmove_number += 1;
     }
 
+    // ── Incremental Zobrist hash: XOR in new state ──
+
+    // Final piece on to square (handles promotion)
+    let final_piece = if mv.promotion != 0 { mv.promotion } else { moving_piece };
+
+    board.hash ^= ZOBRIST.keys[zobrist_key(final_piece, mv.to)];
+
+    // En passant capture: remove the captured pawn
+    if (mv.to as i8) == saved_ep_square && moving_piece.abs() == 1 {
+
+        let pawn_sq = if current_side == Color::White { mv.to + 8 } else { mv.to - 8 };
+
+        let captured_pawn = if current_side == Color::White { B_PAWN } else { W_PAWN };
+
+        board.hash ^= ZOBRIST.keys[zobrist_key(captured_pawn, pawn_sq)];
+    }
+
+    // Castling rook movement
+    if is_king {
+
+        if mv.from == 4 && mv.to == 6 {
+
+            board.hash ^= ZOBRIST.keys[zobrist_key(W_ROOK, 7)];
+
+            board.hash ^= ZOBRIST.keys[zobrist_key(W_ROOK, 5)];
+        } else if mv.from == 4 && mv.to == 2 {
+
+            board.hash ^= ZOBRIST.keys[zobrist_key(W_ROOK, 0)];
+
+            board.hash ^= ZOBRIST.keys[zobrist_key(W_ROOK, 3)];
+        } else if mv.from == 60 && mv.to == 62 {
+
+            board.hash ^= ZOBRIST.keys[zobrist_key(B_ROOK, 63)];
+
+            board.hash ^= ZOBRIST.keys[zobrist_key(B_ROOK, 61)];
+        } else if mv.from == 60 && mv.to == 58 {
+
+            board.hash ^= ZOBRIST.keys[zobrist_key(B_ROOK, 56)];
+
+            board.hash ^= ZOBRIST.keys[zobrist_key(B_ROOK, 59)];
+        }
+    }
+
+    // Lost castling rights: XOR out the rights that were removed
+    let lost_rights = saved_castling_rights ^ board.castling_rights;
+
+    if lost_rights & CASTLING_WK != 0 {
+
+        board.hash ^= ZOBRIST.keys[769];
+    }
+
+    if lost_rights & CASTLING_WQ != 0 {
+
+        board.hash ^= ZOBRIST.keys[770];
+    }
+
+    if lost_rights & CASTLING_BK != 0 {
+
+        board.hash ^= ZOBRIST.keys[771];
+    }
+
+    if lost_rights & CASTLING_BQ != 0 {
+
+        board.hash ^= ZOBRIST.keys[772];
+    }
+
+    // New en passant square
+    if board.en_passant_square != -1 {
+
+        board.hash ^= ZOBRIST.keys[773 + (board.en_passant_square as usize & 7)];
+    }
+
     MoveUndo {
         captured,
         ep_square: saved_ep_square,
         castling_rights: saved_castling_rights,
         halfmove_clock: saved_halfmove_clock,
+        hash: saved_hash,
     }
 }
 
 fn unmake_move(board: &mut Board, mv: Move, undo: MoveUndo) {
+
+    // Restore pre-move Zobrist hash (avoids needing to reverse the incremental update)
+    board.hash = undo.hash;
 
     let current_side = board.side_to_move; // side AFTER the move (opponent of the one that moved)
     let opponent = current_side.opposite();
@@ -1248,6 +1351,13 @@ impl XorShift64 {
 
         self.0
     }
+}
+
+/// Compute the Zobrist key index for a piece on a square.
+fn zobrist_key(piece: i8, sq: Square) -> usize {
+    let pt = piece.unsigned_abs() as usize - 1; // 0..5
+    let color = if piece > 0 { 0 } else { 1 }; // 0=White, 1=Black
+    (pt * 2 + color) * 64 + sq as usize
 }
 
 struct Zobrist {
@@ -1515,8 +1625,8 @@ fn search(board: &mut Board, depth: usize, mut alpha: i32, beta: i32) -> (i32, M
         return (score, best_move);
     }
 
-    // ── TT probe ──
-    let zobrist_key = ZOBRIST.hash(board);
+    // ── TT probe (uses incremental hash — O(1) instead of O(64)) ──
+    let zobrist_key = board.hash;
 
     let tt_result = TT.probe(zobrist_key);
 

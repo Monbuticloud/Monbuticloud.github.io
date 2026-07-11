@@ -1605,10 +1605,12 @@ impl TranspositionTable {
 static TT: LazyLock<TranspositionTable> = LazyLock::new(TranspositionTable::new);
 
 // -----------------------------------------------------------------------------
-// Search (Negamax with alpha-beta + TT)
+// Search (Negamax with alpha-beta + TT + killers + LMR)
 // -----------------------------------------------------------------------------
 
-fn search(board: &mut Board, depth: usize, mut alpha: i32, beta: i32) -> (i32, Move) {
+const MAX_PLY: usize = 64;
+
+fn search(board: &mut Board, depth: usize, mut alpha: i32, beta: i32, killers: &mut [[Move; 2]], ply: usize) -> (i32, Move) {
 
     let mut best_move = Move {
         from: 0,
@@ -1706,6 +1708,10 @@ fn search(board: &mut Board, depth: usize, mut alpha: i32, beta: i32) -> (i32, M
     // MVV-LVA move ordering: score captures by (victim_value - attacker_value)
     let mut move_scores = [0i16; MAX_MOVES];
 
+    let k0 = killers[ply][0];
+
+    let k1 = killers[ply][1];
+
     for i in 0..pseudo_moves.count {
 
         let mv = pseudo_moves.moves[i];
@@ -1721,6 +1727,12 @@ fn search(board: &mut Board, depth: usize, mut alpha: i32, beta: i32) -> (i32, M
 
             // Promotions score between minor (330) and major (500+)
             move_scores[i] = piece_value(mv.promotion) as i16 / 10;
+        } else if mv.from == k0.from && mv.to == k0.to && mv.promotion == k0.promotion
+            || mv.from == k1.from && mv.to == k1.to && mv.promotion == k1.promotion
+        {
+
+            // Killer moves: quiet moves that caused cutoffs at this ply
+            move_scores[i] = 50;
         }
     }
 
@@ -1756,7 +1768,7 @@ fn search(board: &mut Board, depth: usize, mut alpha: i32, beta: i32) -> (i32, M
 
         board.side_to_move = board.side_to_move.opposite();
 
-        let (null_score, _) = search(board, depth - 1 - 2, -beta, -beta + 1);
+        let (null_score, _) = search(board, depth - 1 - 2, -beta, -beta + 1, killers, ply + 1);
 
         board.side_to_move = board.side_to_move.opposite();
 
@@ -1768,9 +1780,13 @@ fn search(board: &mut Board, depth: usize, mut alpha: i32, beta: i32) -> (i32, M
         }
     }
 
+    let in_check_pos = in_check(board);
+
     for i in 0..pseudo_moves.count {
 
         let mv = pseudo_moves.moves[i];
+
+        let is_quiet = board.board[mv.to as usize] == EMPTY && mv.promotion == 0;
 
         let undo = make_move(board, mv);
 
@@ -1782,9 +1798,26 @@ fn search(board: &mut Board, depth: usize, mut alpha: i32, beta: i32) -> (i32, M
             continue;
         }
 
-        let (child_score, _) = search(board, depth - 1, -beta, -alpha);
+        // ── Late Move Reduction (LMR): search late quiet moves at reduced depth ──
+        let search_depth = if depth >= 3 && i >= 4 && is_quiet && !in_check_pos {
 
-        let score = -child_score;
+            depth - 1 - if i >= 8 { 2 } else { 1 }
+        } else {
+
+            depth - 1
+        };
+
+        let (child_score, _) = search(board, search_depth, -beta, -alpha, killers, ply + 1);
+
+        let mut score = -child_score;
+
+        // LMR re-search: if the reduced search beat alpha, try full depth
+        if search_depth != depth - 1 && score > alpha {
+
+            let (child_score, _) = search(board, depth - 1, -beta, -alpha, killers, ply + 1);
+
+            score = -child_score;
+        }
 
         unmake_move(board, mv, undo);
 
@@ -1795,6 +1828,14 @@ fn search(board: &mut Board, depth: usize, mut alpha: i32, beta: i32) -> (i32, M
             best_move = mv;
 
             if alpha >= beta {
+
+                // Store killer: quiet move that caused a beta cutoff
+                if is_quiet && mv.from != mv.to {
+
+                    killers[ply][1] = killers[ply][0];
+
+                    killers[ply][0] = mv;
+                }
 
                 break;
             }
@@ -1834,15 +1875,22 @@ pub fn best_move(fen: &str, depth: usize) -> Option<String> {
 
     // Iterative deepening: search depth 1→N so each level warms the TT
     // for the next. This gives near‑optimal move ordering at the target depth.
+    // Killers persist across iterations for better ordering.
     let mut best_move = Move {
         from: 0,
         to: 0,
         promotion: 0,
     };
 
+    let mut killers = [[Move {
+        from: 0,
+        to: 0,
+        promotion: 0,
+    }; 2]; MAX_PLY];
+
     for d in 1..=depth {
 
-        let (_, mv) = search(&mut board, d, -30000, 30000);
+        let (_, mv) = search(&mut board, d, -30000, 30000, &mut killers, 0);
 
         if mv.from != mv.to || mv.promotion != 0 {
 

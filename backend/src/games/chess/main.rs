@@ -341,7 +341,7 @@ fn square_name(square: Square) -> String {
 // Move generation (pseudo-legal)
 // -----------------------------------------------------------------------------
 
-const MAX_MOVES: usize = 256;
+const MAX_MOVES: usize = 218;
 
 struct MoveList {
     moves: [Move; MAX_MOVES],
@@ -1150,7 +1150,13 @@ fn evaluate_board(board: &Board) -> i32 {
 
                 let material = piece_value(piece);
 
-                let pst = if piece > 0 { PST[square as usize] } else { PST[(63 - square) as usize] };
+                let pst = if piece > 0 {
+
+                    PST[square as usize]
+                } else {
+
+                    PST[(63 - square) as usize]
+                };
 
                 let total = material + pst;
 

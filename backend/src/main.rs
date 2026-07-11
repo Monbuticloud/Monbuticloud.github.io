@@ -1,17 +1,44 @@
-use axum::http::StatusCode;
 use axum::{
     Router,
     body::Body,
-    http::{Response, header},
+    http::{Response, StatusCode, header},
+    middleware::{self, Next},
     routing::get,
 };
+use chrono::{DateTime, Utc};
+use crossbeam::queue::SegQueue;
+use std::collections::HashMap;
 use std::env;
 use std::io::{Write, stdout};
 use std::net::SocketAddr;
+use std::sync::{LazyLock, RwLock};
+use std::time::Duration;
 use tokio::runtime::Builder;
 use tower_http::services::ServeDir;
 
+static REQUEST_LOG: LazyLock<SegQueue<(String, DateTime<Utc>)>> = LazyLock::new(SegQueue::new);
+
+static FILE_CACHE: LazyLock<RwLock<HashMap<&'static str, (StatusCode, String, &'static mime::Mime)>>> =
+    LazyLock::new(|| RwLock::new(HashMap::new()));
+
 fn main() {
+    // ── Background flusher: drain queue to stdout every 500ms ──
+    let ticker = crossbeam::channel::tick(Duration::from_millis(500));
+    std::thread::spawn(move || {
+        loop {
+            ticker.recv().unwrap();
+            let mut buf = String::new();
+            while let Some((path, time)) = REQUEST_LOG.pop() {
+                use std::fmt::Write;
+                let _ = writeln!(buf, "[{}] {}", time.format("%H:%M:%S"), path);
+            }
+            if !buf.is_empty() {
+                print!("{buf}");
+                stdout().flush().ok();
+            }
+        }
+    });
+
     let rt = Builder::new_multi_thread()
         .enable_all()
         .max_blocking_threads(32_768)
@@ -24,58 +51,29 @@ fn main() {
 
         let app = Router::new()
             //- index
-            .route("/", get(|| serve_static("static/index.html", &mime::TEXT_HTML)))
-            .route("/index", get(|| serve_static("static/index.html", &mime::TEXT_HTML)))
-            .route(
-                "/index.html",
-                get(|| serve_static("static/index.html", &mime::TEXT_HTML)),
-            )
-            .route(
-                "/script.js",
-                get(|| serve_static("static/script.js", &mime::APPLICATION_JAVASCRIPT)),
-            )
-            .route("/style.css", get(|| serve_static("static/style.css", &mime::TEXT_CSS)))
+            .route("/", get(|| serve_static("static/index.html")))
+            .route("/index", get(|| serve_static("static/index.html")))
+            .route("/index.html", get(|| serve_static("static/index.html")))
+            .route("/script.js", get(|| serve_static("static/script.js")))
+            .route("/style.css", get(|| serve_static("static/style.css")))
             //- contact
-            .route(
-                "/contact",
-                get(|| serve_static("static/contact.html", &mime::TEXT_HTML)),
-            )
-            .route(
-                "/contact.html",
-                get(|| serve_static("static/contact.html", &mime::TEXT_HTML)),
-            )
-            .route(
-                "/contact.js",
-                get(|| serve_static("static/contact.js", &mime::APPLICATION_JAVASCRIPT)),
-            )
-            .route(
-                "/contact.css",
-                get(|| serve_static("static/contact.css", &mime::TEXT_CSS)),
-            )
+            .route("/contact", get(|| serve_static("static/contact.html")))
+            .route("/contact.html", get(|| serve_static("static/contact.html")))
+            .route("/contact.js", get(|| serve_static("static/contact.js")))
+            .route("/contact.css", get(|| serve_static("static/contact.css")))
             //- projects
-            .route(
-                "/projects",
-                get(|| serve_static("static/projects.html", &mime::TEXT_HTML)),
-            )
-            .route(
-                "/projects.html",
-                get(|| serve_static("static/projects.html", &mime::TEXT_HTML)),
-            )
-            .route(
-                "/projects.js",
-                get(|| serve_static("static/projects.js", &mime::APPLICATION_JAVASCRIPT)),
-            )
-            .route(
-                "/projects.css",
-                get(|| serve_static("static/projects.css", &mime::TEXT_CSS)),
-            )
+            .route("/projects", get(|| serve_static("static/projects.html")))
+            .route("/projects.html", get(|| serve_static("static/projects.html")))
+            .route("/projects.js", get(|| serve_static("static/projects.js")))
+            .route("/projects.css", get(|| serve_static("static/projects.css")))
             //-static assets
             .nest_service("/static/assets", ServeDir::new("/static/assets"))
-            //-commonjs
-            .route(
-                "/common.js",
-                get(|| serve_static("static/common.js", &mime::APPLICATION_JAVASCRIPT)),
-            );
+            //-common.js
+            .route("/common.js", get(|| serve_static("static/common.js")))
+            //-common.css
+            .route("/common.css", get(|| serve_static("static/common.css")))
+            //-404
+            .layer(middleware::from_fn(track_request));
 
         println!("listening on {addr}");
         stdout().flush().ok();
@@ -86,8 +84,30 @@ fn main() {
     });
 }
 
+fn mime_for_path(path: &str) -> &'static mime::Mime {
+    if path.ends_with(".html") {
+        &mime::TEXT_HTML
+    } else if path.ends_with(".css") {
+        &mime::TEXT_CSS
+    } else if path.ends_with(".js") {
+        &mime::APPLICATION_JAVASCRIPT
+    } else {
+        &mime::TEXT_PLAIN
+    }
+}
+
 #[inline(always)]
-async fn serve_static(path: &str, mime: &mime::Mime) -> Response<Body> {
+async fn serve_static(path: &'static str) -> Response<Body> {
+    if let Some(cached) = FILE_CACHE.read().unwrap().get(path) {
+        let (status, content, mime) = cached;
+        return Response::builder()
+            .status(*status)
+            .header(header::CONTENT_TYPE, mime.as_ref())
+            .body(Body::from(content.clone()))
+            .unwrap();
+    }
+
+    let mime = mime_for_path(path);
     let (status, content) = match tokio::fs::read_to_string(path).await {
         Ok(c) => (StatusCode::OK, c),
         Err(_) => (
@@ -95,9 +115,22 @@ async fn serve_static(path: &str, mime: &mime::Mime) -> Response<Body> {
             "<h1>Internal Server Error</h1>".into(),
         ),
     };
+
+    FILE_CACHE
+        .write()
+        .unwrap()
+        .insert(path, (status, content.clone(), mime));
+
     Response::builder()
         .status(status)
         .header(header::CONTENT_TYPE, mime.as_ref())
         .body(Body::from(content))
         .unwrap()
+}
+
+async fn track_request(request: axum::http::Request<Body>, next: Next) -> Response<Body> {
+    let path = request.uri().path().to_owned();
+    let time = Utc::now();
+    REQUEST_LOG.push((path, time));
+    next.run(request).await
 }

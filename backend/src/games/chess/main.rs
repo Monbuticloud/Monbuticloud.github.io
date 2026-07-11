@@ -127,7 +127,7 @@ const PST: [i32; 64] = [
     0, 0, 0, 20, 20, 0, 0, 0, 5, -5, -10, 0, 0, -10, -5, 5, 5, 10, 10, -20, -20, 10, 10, 5, 0, 0, 0, 0, 0, 0, 0, 0,
 ];
 
-type Square = usize; // 0..63
+type Square = u8; // 0..63
 
 // Castling rights as bitmask (bits: 0=White King-side, 1=White Queen-side,
 // 2=Black King-side, 3=Black Queen-side)
@@ -195,7 +195,7 @@ impl Board {
 
     fn color_of(&self, square: Square) -> Option<Color> {
 
-        let piece = self.board[square];
+        let piece = self.board[square as usize];
 
         if piece == EMPTY {
 
@@ -387,9 +387,9 @@ fn generate_pseudo_legal_moves(board: &Board) -> MoveList {
 
     let pawn_direction = if current_side == Color::White { -8 } else { 8 };
 
-    for square in 0..64 {
+    for square in 0..64u8 {
 
-        let piece = board.board[square];
+        let piece = board.board[square as usize];
 
         // Skip empty squares and opponent pieces
         if piece == EMPTY || (piece > 0) != (current_sign == 1) {
@@ -405,7 +405,7 @@ fn generate_pseudo_legal_moves(board: &Board) -> MoveList {
                 // ── Pawn ──
                 let one_forward = (square as i8 + pawn_direction) as Square;
 
-                if one_forward < 64 && board.board[one_forward] == EMPTY {
+                if one_forward < 64 && board.board[one_forward as usize] == EMPTY {
 
                     if square / 8 == promotion_rank {
 
@@ -441,7 +441,7 @@ fn generate_pseudo_legal_moves(board: &Board) -> MoveList {
 
                             let two_forward = (square as i8 + 2 * pawn_direction) as Square;
 
-                            if board.board[two_forward] == EMPTY {
+                            if board.board[two_forward as usize] == EMPTY {
 
                                 moves.push(Move::new(square, two_forward));
                             }
@@ -462,7 +462,7 @@ fn generate_pseudo_legal_moves(board: &Board) -> MoveList {
 
                     if target_square < 64 {
 
-                        let target = board.board[target_square];
+                        let target = board.board[target_square as usize];
 
                         let is_opponent = target != EMPTY && (target > 0) != (current_sign == 1);
 
@@ -526,7 +526,7 @@ fn generate_pseudo_legal_moves(board: &Board) -> MoveList {
 
                         if target == EMPTY || (target > 0) != (current_sign == 1) {
 
-                            moves.push(Move::new(square, target_square as usize));
+                            moves.push(Move::new(square, target_square as u8));
                         }
                     }
                 }
@@ -556,13 +556,13 @@ fn generate_pseudo_legal_moves(board: &Board) -> MoveList {
 
                             if (target > 0) != (current_sign == 1) {
 
-                                moves.push(Move::new(square, current_square as usize));
+                                moves.push(Move::new(square, current_square as u8));
                             }
 
                             break;
                         }
 
-                        moves.push(Move::new(square, current_square as usize));
+                        moves.push(Move::new(square, current_square as u8));
 
                         // File wrap check before next step
                         if (moving_left && (current_square as usize) % 8 == 0)
@@ -597,13 +597,13 @@ fn generate_pseudo_legal_moves(board: &Board) -> MoveList {
 
                             if (target > 0) != (current_sign == 1) {
 
-                                moves.push(Move::new(square, current_square as usize));
+                                moves.push(Move::new(square, current_square as u8));
                             }
 
                             break;
                         }
 
-                        moves.push(Move::new(square, current_square as usize));
+                        moves.push(Move::new(square, current_square as u8));
 
                         // File wrap check before next horizontal step
                         if (direction == -1 && (current_square as usize) % 8 == 0)
@@ -642,13 +642,13 @@ fn generate_pseudo_legal_moves(board: &Board) -> MoveList {
 
                             if (target > 0) != (current_sign == 1) {
 
-                                moves.push(Move::new(square, current_square as usize));
+                                moves.push(Move::new(square, current_square as u8));
                             }
 
                             break;
                         }
 
-                        moves.push(Move::new(square, current_square as usize));
+                        moves.push(Move::new(square, current_square as u8));
 
                         // File wrap check before next step
                         if (moving_left && (current_square as usize) % 8 == 0)
@@ -675,7 +675,7 @@ fn generate_pseudo_legal_moves(board: &Board) -> MoveList {
 
                         if target == EMPTY || (target > 0) != (current_sign == 1) {
 
-                            moves.push(Move::new(square, target_square as usize));
+                            moves.push(Move::new(square, target_square as u8));
                         }
                     }
                 }
@@ -874,9 +874,9 @@ fn in_check(board: &Board) -> bool {
 
     let mut king_square = 0;
 
-    for square in 0..64 {
+    for square in 0..64u8 {
 
-        if board.board[square] == king_piece {
+        if board.board[square as usize] == king_piece {
 
             king_square = square;
 
@@ -904,7 +904,7 @@ fn make_move(board: &mut Board, mv: Move) -> MoveUndo {
 
     let opponent = current_side.opposite();
 
-    let captured = board.board[mv.to];
+    let captured = board.board[mv.to as usize];
 
     let saved_ep_square = board.en_passant_square;
 
@@ -912,26 +912,26 @@ fn make_move(board: &mut Board, mv: Move) -> MoveUndo {
 
     let saved_halfmove_clock = board.halfmove_clock;
 
-    let moving_piece = board.board[mv.from];
+    let moving_piece = board.board[mv.from as usize];
 
     let is_king = moving_piece == (if current_side == Color::White { W_KING } else { B_KING });
 
     let is_rook = !is_king && moving_piece.abs() == 4;
 
     // Move piece
-    board.board[mv.to] = moving_piece;
+    board.board[mv.to as usize] = moving_piece;
 
-    board.board[mv.from] = EMPTY;
+    board.board[mv.from as usize] = EMPTY;
 
     // Promotion
     if mv.promotion != 0 {
 
-        board.board[mv.to] = mv.promotion;
+        board.board[mv.to as usize] = mv.promotion;
     }
 
     // En passant capture
     if (mv.to as i8) == board.en_passant_square
-        && board.board[mv.to] == (if current_side == Color::White { W_PAWN } else { B_PAWN })
+        && board.board[mv.to as usize] == (if current_side == Color::White { W_PAWN } else { B_PAWN })
     {
 
         let captured_pawn_square = if current_side == Color::White {
@@ -942,7 +942,7 @@ fn make_move(board: &mut Board, mv: Move) -> MoveUndo {
             mv.to - 8
         };
 
-        board.board[captured_pawn_square] = EMPTY;
+        board.board[captured_pawn_square as usize] = EMPTY;
     }
 
     // Castling: move the rook when the king castles
@@ -984,22 +984,22 @@ fn make_move(board: &mut Board, mv: Move) -> MoveUndo {
     }
 
     // Rook was captured on its starting square
-    if board.board[mv.to] == W_ROOK && mv.to == 7 {
+    if board.board[mv.to as usize] == W_ROOK && mv.to == 7 {
 
         board.castling_rights &= !CASTLING_WK;
     }
 
-    if board.board[mv.to] == W_ROOK && mv.to == 0 {
+    if board.board[mv.to as usize] == W_ROOK && mv.to == 0 {
 
         board.castling_rights &= !CASTLING_WQ;
     }
 
-    if board.board[mv.to] == B_ROOK && mv.to == 63 {
+    if board.board[mv.to as usize] == B_ROOK && mv.to == 63 {
 
         board.castling_rights &= !CASTLING_BK;
     }
 
-    if board.board[mv.to] == B_ROOK && mv.to == 56 {
+    if board.board[mv.to as usize] == B_ROOK && mv.to == 56 {
 
         board.castling_rights &= !CASTLING_BQ;
     }
@@ -1026,7 +1026,7 @@ fn make_move(board: &mut Board, mv: Move) -> MoveUndo {
     }
 
     // Update en passant
-    if board.board[mv.to].abs() == 1 && (mv.to as i8 - mv.from as i8).abs() == 16 {
+    if board.board[mv.to as usize].abs() == 1 && (mv.to as i8 - mv.from as i8).abs() == 16 {
 
         board.en_passant_square = ((mv.from as i8 + mv.to as i8) / 2) as i8;
     } else {
@@ -1035,7 +1035,7 @@ fn make_move(board: &mut Board, mv: Move) -> MoveUndo {
     }
 
     // Halfmove clock: reset on capture or pawn move
-    if captured != EMPTY || board.board[mv.to].abs() == 1 {
+    if captured != EMPTY || board.board[mv.to as usize].abs() == 1 {
 
         board.halfmove_clock = 0;
     } else {
@@ -1082,14 +1082,14 @@ fn unmake_move(board: &mut Board, mv: Move, undo: MoveUndo) {
     board.halfmove_clock = undo.halfmove_clock;
 
     // Restore the piece to its original square
-    board.board[mv.from] = board.board[mv.to];
+    board.board[mv.from as usize] = board.board[mv.to as usize];
 
-    board.board[mv.to] = undo.captured;
+    board.board[mv.to as usize] = undo.captured;
 
     // Promotion: revert the promoted piece back to a pawn
     if mv.promotion != 0 {
 
-        board.board[mv.from] = if opponent == Color::White { W_PAWN } else { B_PAWN };
+        board.board[mv.from as usize] = if opponent == Color::White { W_PAWN } else { B_PAWN };
     }
 
     // En passant capture: restore the captured pawn
@@ -1097,11 +1097,11 @@ fn unmake_move(board: &mut Board, mv: Move, undo: MoveUndo) {
 
         let captured_pawn_square = if opponent == Color::White { mv.to + 8 } else { mv.to - 8 };
 
-        board.board[captured_pawn_square] = if opponent == Color::White { B_PAWN } else { W_PAWN };
+        board.board[captured_pawn_square as usize] = if opponent == Color::White { B_PAWN } else { W_PAWN };
     }
 
     // Castling: restore the rook to its original square
-    if board.board[mv.from] == (if opponent == Color::White { W_KING } else { B_KING }) {
+    if board.board[mv.from as usize] == (if opponent == Color::White { W_KING } else { B_KING }) {
 
         if mv.from == 4 && mv.to == 6 {
 
@@ -1138,19 +1138,19 @@ fn evaluate_board(board: &Board) -> i32 {
     let mut score = i32x4::ZERO;
 
     // Process 4 squares per SIMD lane
-    for chunk in (0..64).step_by(4) {
+    for chunk in (0..64u8).step_by(4) {
 
         let mut vals = [0i32; 4];
 
         for (j, square) in (chunk..chunk + 4).enumerate() {
 
-            let piece = board.board[square];
+            let piece = board.board[square as usize];
 
             if piece != EMPTY {
 
                 let material = piece_value(piece);
 
-                let pst = if piece > 0 { PST[square] } else { PST[63 - square] };
+                let pst = if piece > 0 { PST[square as usize] } else { PST[(63 - square) as usize] };
 
                 let total = material + pst;
 
@@ -1191,7 +1191,7 @@ fn quiesce(board: &mut Board, mut alpha: i32, beta: i32) -> i32 {
         let mv = moves.moves[i];
 
         // Only consider captures and promotions — skip quiet moves
-        if board.board[mv.to] == EMPTY && mv.promotion == 0 {
+        if board.board[mv.to as usize] == EMPTY && mv.promotion == 0 {
 
             continue;
         }
@@ -1264,11 +1264,11 @@ fn search(board: &mut Board, depth: usize, mut alpha: i32, beta: i32) -> (i32, M
 
         let mv = pseudo_moves.moves[i];
 
-        if board.board[mv.to] != EMPTY {
+        if board.board[mv.to as usize] != EMPTY {
 
-            let victim = piece_value(board.board[mv.to]) as i16;
+            let victim = piece_value(board.board[mv.to as usize]) as i16;
 
-            let attacker = piece_value(board.board[mv.from]) as i16;
+            let attacker = piece_value(board.board[mv.from as usize]) as i16;
 
             move_scores[i] = victim - attacker;
         } else if mv.promotion != 0 {

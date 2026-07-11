@@ -991,22 +991,22 @@ fn make_move(board: &mut Board, mv: Move) -> MoveUndo {
     }
 
     // Rook was captured on its starting square
-    if board.board[mv.to as usize] == W_ROOK && mv.to == 7 {
+    if captured == W_ROOK && mv.to == 7 {
 
         board.castling_rights &= !CASTLING_WK;
     }
 
-    if board.board[mv.to as usize] == W_ROOK && mv.to == 0 {
+    if captured == W_ROOK && mv.to == 0 {
 
         board.castling_rights &= !CASTLING_WQ;
     }
 
-    if board.board[mv.to as usize] == B_ROOK && mv.to == 63 {
+    if captured == B_ROOK && mv.to == 63 {
 
         board.castling_rights &= !CASTLING_BK;
     }
 
-    if board.board[mv.to as usize] == B_ROOK && mv.to == 56 {
+    if captured == B_ROOK && mv.to == 56 {
 
         board.castling_rights &= !CASTLING_BQ;
     }

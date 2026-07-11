@@ -29,6 +29,26 @@ RUN rm -rf src
 # are preserved in the cache.
 COPY src/ src/
 COPY static/*.html static/*.css static/*.js static/assets/icons.svg static/assets/images/laptop-fullstack-optim.avif static/assets/images/laptop-fullstack-optim_hd.avif /static/
+
+# ── Minify static assets (builder stage only — zero impact on final image) ──
+RUN apk add --no-cache nodejs npm && \
+    npm install -g html-minifier-terser uglify-js csso-cli svgo && \
+    for f in /static/*.html; do \
+        html-minifier-terser --collapse-whitespace --remove-comments \
+          --remove-optional-tags -o "$f" "$f" 2>/dev/null || true; \
+    done && \
+    for f in /static/*.css; do \
+        csso "$f" --output "$f" 2>/dev/null || true; \
+    done && \
+    for f in /static/*.js; do \
+        uglifyjs "$f" --compress --mangle -o "$f" 2>/dev/null || true; \
+    done && \
+    for f in /static/assets/*.svg; do \
+        svgo --quiet --precision 2 -i "$f" -o "$f" 2>/dev/null || true; \
+    done && \
+    apk del nodejs npm && \
+    rm -rf /root/.npm /root/.cache /usr/lib/node_modules
+
 RUN TARGET=$(cat /target.txt) && \
     rm -f "target/$TARGET/release/backend" && \
     rm -rf "target/$TARGET/release/.fingerprint/backend-"* && \

@@ -1,3 +1,8 @@
+# ╔══════════════════════════════════════════════════════════════╗
+# ║  DEPRECATED — Koyeb nginx config. Use default.conf          ║
+# ║  with docker-compose instead.                               ║
+# ╚══════════════════════════════════════════════════════════════╝
+
 upstream app {
     server      app:8000;
     keepalive   64;
@@ -23,7 +28,7 @@ server {
 
     # ── Compression ──
     gzip on;
-    gzip_types text/html text/css application/javascript image/svg+xml;
+    gzip_types text/css application/javascript image/svg+xml;
     gzip_min_length 256;
 
     # ── Static assets (icons, images) ──
@@ -44,11 +49,12 @@ server {
         proxy_set_header        X-Forwarded-Proto   $scheme;
         expires                 5s;
 
-        # Big buffering
-        proxy_buffering         on;
-        proxy_buffer_size       8k;
-        proxy_buffers           8 256k;
-        proxy_busy_buffers_size 512k;
-        proxy_max_temp_file_size 0;
+        # Buffering
+        proxy_buffering             on;
+        proxy_buffer_size           4k;
+        proxy_buffers               8 16k;
+        proxy_busy_buffers_size     16k;
+        proxy_max_temp_file_size    1m;
+        proxy_temp_file_write_size  32k;
     }
 }

@@ -1,0 +1,38 @@
+# ╔══════════════════════════════════════════════════════════════╗
+# ║  DEPRECATED — Koyeb deployment no longer maintained.        ║
+# ║  See backend/docker-compose.yml + backend/Dockerfile for    ║
+# ║  the current Docker-based deployment.                       ║
+# ╚══════════════════════════════════════════════════════════════╝
+
+name: homepage
+
+services:
+  - name: nginx
+    build:
+      docker:
+        dockerfile: backend/nginx/Dockerfile.koyeb
+        context: backend
+    instance_type: free
+    scaling:
+      min: 1
+      max: 1
+    ports:
+      - port: 80
+        protocols: [http]
+    routes:
+      - path: /
+        port: 80
+
+  - name: app
+    build:
+      docker:
+        dockerfile: backend/Dockerfile
+        context: backend
+    instance_type: free
+    scaling:
+      min: 1
+      max: 1
+    ports:
+      - port: 8000
+        protocols: [http]
+    routes: []

@@ -1,0 +1,9 @@
+# ╔══════════════════════════════════════════════════════════════╗
+# ║  DEPRECATED — Koyeb Dockerfile. Use Dockerfile (scratch)    ║
+# ║  + docker-compose.yml for current deployment.               ║
+# ╚══════════════════════════════════════════════════════════════╝
+
+FROM dhi.io/nginx:1-alpine
+
+COPY nginx/default.koyeb.conf /etc/nginx/conf.d/default.conf
+COPY static/ /var/www/static/

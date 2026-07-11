@@ -18,3 +18,5 @@ trailing_comma = "Vertical"
 match_block_trailing_comma = true
 blank_lines_lower_bound = 1
 blank_lines_upper_bound = 2
+fn_params_layout = "Compressed"
+fn_call_width = 120

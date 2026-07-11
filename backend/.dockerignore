@@ -5,4 +5,3 @@ Dockerfile
 .gitignore
 .cargo
 .config
-nginx/certs

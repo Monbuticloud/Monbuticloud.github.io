@@ -36,17 +36,6 @@ impl Color {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
-
-enum PieceType {
-    Pawn,
-    Knight,
-    Bishop,
-    Rook,
-    Queen,
-    King,
-}
-
 // We represent a piece as an i8 on the board:
 // positive = White, negative = Black, zero = Empty.
 // The absolute value gives the piece type index (1..6).
@@ -75,29 +64,6 @@ const B_ROOK: i8 = -4;
 const B_QUEEN: i8 = -5;
 
 const B_KING: i8 = -6;
-
-// Convert a piece i8 to a (Color, PieceType) pair, if non-empty.
-fn piece_info(piece: i8) -> Option<(Color, PieceType)> {
-
-    if piece == EMPTY {
-
-        return None;
-    }
-
-    let color = if piece > 0 { Color::White } else { Color::Black };
-
-    let piece_type = match piece.abs() {
-        1 => PieceType::Pawn,
-        2 => PieceType::Knight,
-        3 => PieceType::Bishop,
-        4 => PieceType::Rook,
-        5 => PieceType::Queen,
-        6 => PieceType::King,
-        _ => return None,
-    };
-
-    Some((color, piece_type))
-}
 
 // Material values (centipawns)
 const PAWN_VALUE: i32 = 100;

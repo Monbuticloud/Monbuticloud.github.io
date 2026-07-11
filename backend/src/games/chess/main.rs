@@ -1128,36 +1128,41 @@ fn unmake_move(board: &mut Board, mv: Move, undo: MoveUndo) {
 }
 
 // -----------------------------------------------------------------------------
-// Evaluation
+// Evaluation (SIMD via wide::i32x4 — 128-bit registers, 4 squares per op)
 // -----------------------------------------------------------------------------
+
+use wide::i32x4;
 
 fn evaluate_board(board: &Board) -> i32 {
 
-    let mut score = 0;
+    let mut score = i32x4::ZERO;
 
-    for square in 0..64 {
+    // Process 4 squares per SIMD lane
+    for chunk in (0..64).step_by(4) {
 
-        let piece = board.board[square];
+        let mut vals = [0i32; 4];
 
-        if piece == EMPTY {
+        for (j, square) in (chunk..chunk + 4).enumerate() {
 
-            continue;
+            let piece = board.board[square];
+
+            if piece != EMPTY {
+
+                let material = piece_value(piece);
+
+                let pst = if piece > 0 { PST[square] } else { PST[63 - square] };
+
+                let total = material + pst;
+
+                vals[j] = if piece > 0 { total } else { -total };
+            }
         }
 
-        let material_value = piece_value(piece);
-
-        let positional_bonus = if piece > 0 { PST[square] } else { PST[63 - square] };
-
-        if piece > 0 {
-
-            score += material_value + positional_bonus;
-        } else {
-
-            score -= material_value + positional_bonus;
-        }
+        score += i32x4::new(vals);
     }
 
-    score
+    // Horizontal sum of 4 SIMD lanes
+    score.reduce_add()
 }
 
 // -----------------------------------------------------------------------------

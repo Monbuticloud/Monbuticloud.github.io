@@ -10,12 +10,14 @@ use axum::{
 };
 use chrono::{DateTime, Utc};
 use crossbeam::queue::SegQueue;
-use std::collections::HashMap;
-use std::env;
-use std::io::{Write, stdout};
-use std::net::SocketAddr;
-use std::sync::{LazyLock, RwLock};
-use std::time::Duration;
+use std::{
+    collections::HashMap,
+    env,
+    io::{Write, stdout},
+    net::SocketAddr,
+    sync::{LazyLock, RwLock},
+    time::Duration,
+};
 use tokio::runtime::Builder;
 use tower_http::services::ServeDir;
 
@@ -25,18 +27,28 @@ static FILE_CACHE: LazyLock<RwLock<HashMap<&'static str, (StatusCode, String, &'
     LazyLock::new(|| RwLock::new(HashMap::new()));
 
 fn main() {
+
     // ── Background flusher: drain queue to stdout every 500ms ──
     let ticker = crossbeam::channel::tick(Duration::from_millis(500));
+
     std::thread::spawn(move || {
         loop {
+
             ticker.recv().unwrap();
+
             let mut buf = String::new();
+
             while let Some((path, time)) = REQUEST_LOG.pop() {
+
                 use std::fmt::Write;
+
                 let _ = writeln!(buf, "[{}] {}", time.format("%H:%M:%S"), path);
             }
+
             if !buf.is_empty() {
+
                 print!("{buf}");
+
                 stdout().flush().ok();
             }
         }
@@ -49,7 +61,9 @@ fn main() {
         .expect("Failed to create Tokio runtime");
 
     rt.block_on(async {
+
         let port = env::var("PORT").unwrap_or_else(|_| "8000".to_string());
+
         let addr: SocketAddr = format!("0.0.0.0:{port}").parse().expect("Invalid socket address");
 
         let app = Router::new()
@@ -81,6 +95,7 @@ fn main() {
             .layer(middleware::from_fn(track_request));
 
         println!("listening on {addr}");
+
         stdout().flush().ok();
 
         let listener = tokio::net::TcpListener::bind(addr).await.expect("Failed to bind");
@@ -90,21 +105,30 @@ fn main() {
 }
 
 fn mime_for_path(path: &str) -> &'static mime::Mime {
+
     if path.ends_with(".html") {
+
         &mime::TEXT_HTML
     } else if path.ends_with(".css") {
+
         &mime::TEXT_CSS
     } else if path.ends_with(".js") {
+
         &mime::APPLICATION_JAVASCRIPT
     } else {
+
         &mime::TEXT_PLAIN
     }
 }
 
 #[inline(always)]
+
 async fn serve_static(path: &'static str) -> Response<Body> {
+
     if let Some(cached) = FILE_CACHE.read().unwrap().get(path) {
+
         let (status, content, mime) = cached;
+
         return Response::builder()
             .status(*status)
             .header(header::CONTENT_TYPE, mime.as_ref())
@@ -113,6 +137,7 @@ async fn serve_static(path: &'static str) -> Response<Body> {
     }
 
     let mime = mime_for_path(path);
+
     let (status, content) = match tokio::fs::read_to_string(path).await {
         Ok(c) => (StatusCode::OK, c),
         Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "<h1>Internal Server Error</h1>".into()),
@@ -131,15 +156,20 @@ async fn serve_static(path: &'static str) -> Response<Body> {
 }
 
 async fn track_request(request: axum::http::Request<Body>, next: Next) -> Response<Body> {
+
     let path = request.uri().path().to_owned();
+
     let time = Utc::now();
+
     REQUEST_LOG.push((path, time));
+
     next.run(request).await
 }
 
 // ── Chess API ──
 
 fn json_body(status: StatusCode, body: String) -> Response<Body> {
+
     Response::builder()
         .status(status)
         .header(header::CONTENT_TYPE, "application/json")
@@ -152,13 +182,16 @@ fn json_body(status: StatusCode, body: String) -> Response<Body> {
 /// Fixed depth=6 to avoid CPU-exhaustion via arbitrary depth params.
 /// Runs the sunfish-inspired chess engine on a blocking thread
 /// so the async runtime isn't starved.
+
 async fn get_chess_completion(params: Query<HashMap<String, String>>) -> Response<Body> {
+
     let fen = match params.get("fen") {
         Some(f) => f,
         None => return json_body(StatusCode::BAD_REQUEST, r#"{"error":"missing 'fen' query parameter"}"#.into()),
     };
 
     let fen = fen.clone();
+
     let result = tokio::task::spawn_blocking(move || games::chess::best_move(&fen, 6)).await;
 
     match result {

@@ -149,6 +149,8 @@ struct Board {
     en_passant_square: i8, // -1 if none, else square index
     halfmove_clock: u16,
     fullmove_number: u16,
+    wk_sq: u8, // square of white king
+    bk_sq: u8, // square of black king
 }
 
 impl Board {
@@ -161,6 +163,8 @@ impl Board {
             en_passant_square: -1,
             halfmove_clock: 0,
             fullmove_number: 1,
+            wk_sq: 4,  // e1
+            bk_sq: 60, // e8
         }
     }
 
@@ -235,7 +239,17 @@ fn parse_fen(fen: &str) -> Result<Board, &'static str> {
                     _ => EMPTY,
                 };
 
-                board.board[rank * 8 + file] = piece;
+                let sq = (rank * 8 + file) as u8;
+
+                board.board[sq as usize] = piece;
+
+                if piece == W_KING {
+
+                    board.wk_sq = sq;
+                } else if piece == B_KING {
+
+                    board.bk_sq = sq;
+                }
 
                 file += 1;
             }
@@ -835,26 +849,13 @@ fn is_square_attacked(board: &Board, square: Square, by_color: Color) -> bool {
 
 fn in_check(board: &Board) -> bool {
 
-    // Find the king of the side to move
-    let king_piece = if board.side_to_move == Color::White {
+    let king_square = if board.side_to_move == Color::White {
 
-        W_KING
+        board.wk_sq
     } else {
 
-        B_KING
+        board.bk_sq
     };
-
-    let mut king_square = 0;
-
-    for square in 0..64u8 {
-
-        if board.board[square as usize] == king_piece {
-
-            king_square = square;
-
-            break;
-        }
-    }
 
     is_square_attacked(board, king_square, board.side_to_move.opposite())
 }
@@ -894,6 +895,18 @@ fn make_move(board: &mut Board, mv: Move) -> MoveUndo {
     board.board[mv.to as usize] = moving_piece;
 
     board.board[mv.from as usize] = EMPTY;
+
+    // Track king position
+    if is_king {
+
+        if current_side == Color::White {
+
+            board.wk_sq = mv.to;
+        } else {
+
+            board.bk_sq = mv.to;
+        }
+    }
 
     // Promotion
     if mv.promotion != 0 {
@@ -1096,6 +1109,17 @@ fn unmake_move(board: &mut Board, mv: Move, undo: MoveUndo) {
 
             board.board[59] = EMPTY;
         }
+    }
+
+    // Restore king square if the moved piece was a king
+    let restored_piece = board.board[mv.from as usize];
+
+    if restored_piece == W_KING {
+
+        board.wk_sq = mv.from;
+    } else if restored_piece == B_KING {
+
+        board.bk_sq = mv.from;
     }
 }
 

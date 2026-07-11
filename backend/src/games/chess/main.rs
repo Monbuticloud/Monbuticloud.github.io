@@ -209,7 +209,7 @@ fn parse_fen(fen: &str) -> Result<Board, &'static str> {
 
             if character.is_digit(10) {
 
-                let count = character.to_digit(10).unwrap() as usize;
+                let count = character.to_digit(10).expect("validated digit") as usize;
 
                 for _ in 0..count {
 
@@ -271,9 +271,9 @@ fn parse_fen(fen: &str) -> Result<Board, &'static str> {
     // En passant
     if parts[3] != "-" {
 
-        let file = (parts[3].chars().nth(0).unwrap() as u8 - b'a') as usize;
+        let file = (parts[3].chars().nth(0).expect("en passant file char") as u8 - b'a') as usize;
 
-        let rank = (8 - (parts[3].chars().nth(1).unwrap() as u8 - b'0')) as usize;
+        let rank = (8 - (parts[3].chars().nth(1).expect("en passant rank char") as u8 - b'0')) as usize;
 
         board.en_passant_square = (rank * 8 + file) as i8;
     } else {

@@ -348,6 +348,8 @@ fn square_name(square: Square) -> String {
 
 const MAX_MOVES: usize = 218;
 
+const MAX_QUIESCE_PLY: u8 = 8;
+
 struct MoveList {
     moves: [Move; MAX_MOVES],
     count: usize,
@@ -1180,7 +1182,13 @@ fn evaluate_board(board: &Board) -> i32 {
 // Quiescence search (captures only — handles horizon effect)
 // -----------------------------------------------------------------------------
 
-fn quiesce(board: &mut Board, mut alpha: i32, beta: i32) -> i32 {
+fn quiesce(board: &mut Board, mut alpha: i32, beta: i32, ply: u8) -> i32 {
+
+    // Depth limit: prevent explosion on long capture chains
+    if ply >= MAX_QUIESCE_PLY {
+
+        return evaluate_board(board);
+    }
 
     // Static evaluation at this position (the "standing pat" option)
     let stand_pat = evaluate_board(board);
@@ -1216,7 +1224,7 @@ fn quiesce(board: &mut Board, mut alpha: i32, beta: i32) -> i32 {
             continue;
         }
 
-        let score = -quiesce(board, -beta, -alpha);
+        let score = -quiesce(board, -beta, -alpha, ply + 1);
 
         unmake_move(board, mv, undo);
 
@@ -1513,7 +1521,7 @@ fn search(board: &mut Board, depth: usize, mut alpha: i32, beta: i32) -> (i32, M
 
     if depth == 0 {
 
-        let score = quiesce(board, alpha, beta);
+        let score = quiesce(board, alpha, beta, 0);
 
         return (score, best_move);
     }
@@ -1640,6 +1648,27 @@ fn search(board: &mut Board, depth: usize, mut alpha: i32, beta: i32) -> (i32, M
         }
     }
 
+    // ── Null move pruning (skip a turn; if score still ≥ beta, prune) ──
+    if depth >= 3 && !in_check(board) && beta - alpha <= 400 {
+
+        let saved_ep = board.en_passant_square;
+
+        board.en_passant_square = -1;
+
+        board.side_to_move = board.side_to_move.opposite();
+
+        let (null_score, _) = search(board, depth - 1 - 2, -beta, -beta + 1);
+
+        board.side_to_move = board.side_to_move.opposite();
+
+        board.en_passant_square = saved_ep;
+
+        if null_score >= beta {
+
+            return (beta, best_move);
+        }
+    }
+
     for i in 0..pseudo_moves.count {
 
         let mv = pseudo_moves.moves[i];
@@ -1704,9 +1733,25 @@ pub fn best_move(fen: &str, depth: usize) -> Option<String> {
         Err(_) => return None,
     };
 
-    let (_, best_move) = search(&mut board, depth, -30000, 30000);
+    // Iterative deepening: search depth 1→N so each level warms the TT
+    // for the next. This gives near‑optimal move ordering at the target depth.
+    let mut best_move = Move {
+        from: 0,
+        to: 0,
+        promotion: 0,
+    };
 
-    // No legal moves (checkmate or stalemate — returned with from == to)
+    for d in 1..=depth {
+
+        let (_, mv) = search(&mut board, d, -30000, 30000);
+
+        if mv.from != mv.to || mv.promotion != 0 {
+
+            best_move = mv;
+        }
+    }
+
+    // No legal moves (checkmate or stalemate)
     if best_move.from == best_move.to {
 
         return None;

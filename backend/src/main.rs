@@ -177,11 +177,10 @@ fn json_body(status: StatusCode, body: String) -> Response<Body> {
         .unwrap()
 }
 
-/// GET /api/games/chess/completions?fen=...
+/// GET /api/games/chess/completions?fen=...&depth=5
 ///
-/// Fixed depth=6 to avoid CPU-exhaustion via arbitrary depth params.
-/// Runs the sunfish-inspired chess engine on a blocking thread
-/// so the async runtime isn't starved.
+/// `depth`: 1–7, clamped at 7.  8+ reserved for future account tier.
+/// Default 5. Runs on a blocking thread so the async runtime isn't starved.
 
 async fn get_chess_completion(params: Query<HashMap<String, String>>) -> Response<Body> {
 
@@ -190,15 +189,28 @@ async fn get_chess_completion(params: Query<HashMap<String, String>>) -> Respons
         None => return json_body(StatusCode::BAD_REQUEST, r#"{"error":"missing 'fen' query parameter"}"#.into()),
     };
 
+    let depth = params
+        .get("depth")
+        .and_then(|v| v.parse::<usize>().ok())
+        .map(|d| d.clamp(1, 7))
+        .unwrap_or(5);
+
+    // TODO: raise to 9 + gate depth≥8 behind account/auth
+
     let fen = fen.clone();
 
-    let result = tokio::task::spawn_blocking(move || games::chess::best_move(&fen, 6)).await;
+    let search = tokio::task::spawn_blocking(move || games::chess::best_move(&fen, depth));
+
+    let result = tokio::time::timeout(std::time::Duration::from_secs(60), search).await;
 
     match result {
-        Ok(Some(best_move)) => json_body(StatusCode::OK, format!(r#"{{"best_move":"{best_move}"}}"#)),
-        Ok(None) => json_body(StatusCode::BAD_REQUEST, r#"{"error":"no legal moves or invalid FEN"}"#.into()),
-        Err(join_err) => {
+        Ok(Ok(Some(best_move))) => json_body(StatusCode::OK, format!(r#"{{"best_move":"{best_move}"}}"#)),
+        Ok(Ok(None)) => json_body(StatusCode::BAD_REQUEST, r#"{"error":"no legal moves or invalid FEN"}"#.into()),
+        Ok(Err(join_err)) => {
             json_body(StatusCode::INTERNAL_SERVER_ERROR, format!(r#"{{"error":"search panicked: {join_err}"}}"#))
+        },
+        Err(_elapsed) => {
+            json_body(StatusCode::REQUEST_TIMEOUT, r#"{"error":"search timed out after 60s"}"#.into())
         },
     }
 }

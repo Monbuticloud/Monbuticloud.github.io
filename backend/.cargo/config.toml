@@ -1,11 +1,13 @@
-# Cargo configuration
-# Docs: https://doc.rust-lang.org/cargo/reference/config.html
+# Platform-specific linker flags to drop unused code sections after LTO
 
-[alias]
-# Common workflow aliases
-check-all = "check --all-targets --all-features"
-build-rel = "build --release"
-test-all = "test --all-targets"
-clippy-all = "clippy --all-targets --all-features -- -D warnings"
-fmt-check = "fmt --check"
-clean-all = "clean"
+# Linux (ELF — musl, gnu)
+[target.'cfg(target_os = "linux")']
+rustflags = ["-C", "link-args=-Wl,--gc-sections"]
+
+# macOS (Mach-O)
+[target.'cfg(target_vendor = "apple")']
+rustflags = ["-C", "link-args=-Wl,-dead_strip"]
+
+# Windows MSVC (PE/COFF)
+[target.'cfg(target_env = "msvc")']
+rustflags = ["-C", "link-args=/OPT:REF"]

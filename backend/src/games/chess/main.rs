@@ -1910,7 +1910,7 @@ pub fn best_move(fen: &str, depth: usize) -> Option<String> {
         Err(_) => return None,
     };
 
-    crate::log_msg(format!(
+    crate::log_info(format!(
         "[chess] TT={} entries, depth={}, fen={}",
         1 << TT_BITS,
         depth,
@@ -1938,7 +1938,7 @@ pub fn best_move(fen: &str, depth: usize) -> Option<String> {
 
         let is_valid = mv.from != mv.to || mv.promotion != 0;
 
-        crate::log_msg(format!(
+        crate::log_debug(format!(
             "[chess]  depth={d} score={score} best={} valid={is_valid}",
             if is_valid { square_name(mv.from) + &square_name(mv.to) } else { "none".into() },
         ));
@@ -1952,14 +1952,14 @@ pub fn best_move(fen: &str, depth: usize) -> Option<String> {
     // No legal moves (checkmate or stalemate)
     if best_move.from == best_move.to {
 
-        crate::log_msg("[chess]  => None (no valid move found across all depths)".into());
+        crate::log_warn("[chess]  => None (no valid move found across all depths)".into());
 
         return None;
     }
 
     let result = format!("{}{}", square_name(best_move.from), square_name(best_move.to));
 
-    crate::log_msg(format!("[chess]  => {result}"));
+    crate::log_info(format!("[chess]  => {result}"));
 
     Some(result)
 }

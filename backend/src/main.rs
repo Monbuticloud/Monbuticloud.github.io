@@ -21,36 +21,64 @@ use std::{
 use tokio::runtime::Builder;
 use tower_http::services::ServeDir;
 
-pub(crate) static LOG_BUFFER: LazyLock<SegQueue<(String, DateTime<Utc>)>> = LazyLock::new(SegQueue::new);
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum LogLevel {
+    Debug,
+    Info,
+    Warn,
+    Error,
+}
 
-pub(crate) fn log_msg(msg: String) {
-    LOG_BUFFER.push((msg, Utc::now()));
+impl std::fmt::Display for LogLevel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            LogLevel::Debug => write!(f, "DEBUG"),
+            LogLevel::Info => write!(f, "INFO"),
+            LogLevel::Warn => write!(f, "WARN"),
+            LogLevel::Error => write!(f, "ERROR"),
+        }
+    }
+}
+
+pub(crate) static LOG_BUFFER: LazyLock<SegQueue<(String, LogLevel, DateTime<Utc>)>> = LazyLock::new(SegQueue::new);
+
+pub(crate) fn log_msg(level: LogLevel, msg: String) {
+    LOG_BUFFER.push((msg, level, Utc::now()));
+}
+
+pub(crate) fn log_info(msg: String) {
+    log_msg(LogLevel::Info, msg);
+}
+pub(crate) fn log_warn(msg: String) {
+    log_msg(LogLevel::Warn, msg);
+}
+pub(crate) fn log_debug(msg: String) {
+    log_msg(LogLevel::Debug, msg);
+}
+pub(crate) fn log_error(msg: String) {
+    log_msg(LogLevel::Error, msg);
 }
 
 static FILE_CACHE: LazyLock<RwLock<HashMap<&'static str, (StatusCode, String, &'static mime::Mime)>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
 
 fn main() {
-
     // ── Background flusher: drain queue to stdout every 500ms ──
     let ticker = crossbeam::channel::tick(Duration::from_millis(500));
 
     std::thread::spawn(move || {
         loop {
-
             ticker.recv().unwrap();
 
             let mut buf = String::new();
 
-            while let Some((path, time)) = LOG_BUFFER.pop() {
-
+            while let Some((path, level, time)) = LOG_BUFFER.pop() {
                 use std::fmt::Write;
 
-                let _ = writeln!(buf, "[{}] {}", time.format("%H:%M:%S"), path);
+                let _ = writeln!(buf, "[{}] [{:>5}] {}", time.format("%H:%M:%S"), level.to_string(), path);
             }
 
             if !buf.is_empty() {
-
                 print!("{buf}");
 
                 stdout().flush().ok();
@@ -65,7 +93,6 @@ fn main() {
         .expect("Failed to create Tokio runtime");
 
     rt.block_on(async {
-
         let port = env::var("PORT").unwrap_or_else(|_| "8000".to_string());
 
         let addr: SocketAddr = format!("0.0.0.0:{port}").parse().expect("Invalid socket address");
@@ -109,18 +136,13 @@ fn main() {
 }
 
 fn mime_for_path(path: &str) -> &'static mime::Mime {
-
     if path.ends_with(".html") {
-
         &mime::TEXT_HTML
     } else if path.ends_with(".css") {
-
         &mime::TEXT_CSS
     } else if path.ends_with(".js") {
-
         &mime::APPLICATION_JAVASCRIPT
     } else {
-
         &mime::TEXT_PLAIN
     }
 }
@@ -128,9 +150,7 @@ fn mime_for_path(path: &str) -> &'static mime::Mime {
 #[inline(always)]
 
 async fn serve_static(path: &'static str) -> Response<Body> {
-
     if let Some(cached) = FILE_CACHE.read().unwrap().get(path) {
-
         let (status, content, mime) = cached;
 
         return Response::builder()
@@ -160,12 +180,11 @@ async fn serve_static(path: &'static str) -> Response<Body> {
 }
 
 async fn track_request(request: axum::http::Request<Body>, next: Next) -> Response<Body> {
-
     let path = request.uri().path().to_owned();
 
     let time = Utc::now();
 
-    LOG_BUFFER.push((path, time));
+    LOG_BUFFER.push((path, LogLevel::Info, time));
 
     next.run(request).await
 }
@@ -173,7 +192,6 @@ async fn track_request(request: axum::http::Request<Body>, next: Next) -> Respon
 // ── Chess API ──
 
 fn json_body(status: StatusCode, body: String) -> Response<Body> {
-
     Response::builder()
         .status(status)
         .header(header::CONTENT_TYPE, "application/json")
@@ -187,7 +205,6 @@ fn json_body(status: StatusCode, body: String) -> Response<Body> {
 /// Default 5. Runs on a blocking thread so the async runtime isn't starved.
 
 async fn get_chess_completion(params: Query<HashMap<String, String>>) -> Response<Body> {
-
     let fen = match params.get("fen") {
         Some(f) => f,
         None => return json_body(StatusCode::BAD_REQUEST, r#"{"error":"missing 'fen' query parameter"}"#.into()),
@@ -196,10 +213,11 @@ async fn get_chess_completion(params: Query<HashMap<String, String>>) -> Respons
     let depth = params
         .get("depth")
         .and_then(|v| v.parse::<usize>().ok())
-        .map(|d| d.clamp(1, 7))
+        .map(|d| d.clamp(1, 20))
         .unwrap_or(5);
 
     // TODO: raise to 9 + gate depth≥8 behind account/auth
+    // TDOO^2:
 
     let fen = fen.clone();
 
@@ -213,8 +231,6 @@ async fn get_chess_completion(params: Query<HashMap<String, String>>) -> Respons
         Ok(Err(join_err)) => {
             json_body(StatusCode::INTERNAL_SERVER_ERROR, format!(r#"{{"error":"search panicked: {join_err}"}}"#))
         },
-        Err(_elapsed) => {
-            json_body(StatusCode::REQUEST_TIMEOUT, r#"{"error":"search timed out after 60s"}"#.into())
-        },
+        Err(_elapsed) => json_body(StatusCode::REQUEST_TIMEOUT, r#"{"error":"search timed out after 60s"}"#.into()),
     }
 }

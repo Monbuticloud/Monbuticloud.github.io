@@ -1282,17 +1282,23 @@ fn quiesce(board: &mut Board, mut alpha: i32, beta: i32, ply: u8) -> i32 {
         return evaluate_board(board);
     }
 
-    // Static evaluation at this position (the "standing pat" option)
-    let stand_pat = evaluate_board(board);
+    let in_check_pos = in_check(board);
 
-    if stand_pat >= beta {
+    // Static evaluation at this position (the "standing pat" option).
+    // Skip stand-pat if in check — we must resolve the check.
+    if !in_check_pos {
 
-        return beta;
-    }
+        let stand_pat = evaluate_board(board);
 
-    if stand_pat > alpha {
+        if stand_pat >= beta {
 
-        alpha = stand_pat;
+            return beta;
+        }
+
+        if stand_pat > alpha {
+
+            alpha = stand_pat;
+        }
     }
 
     let moves = generate_pseudo_legal_moves(board);
@@ -1301,8 +1307,10 @@ fn quiesce(board: &mut Board, mut alpha: i32, beta: i32, ply: u8) -> i32 {
 
         let mv = moves.moves[i];
 
-        // Only consider captures and promotions — skip quiet moves
-        if board.board[mv.to as usize] == EMPTY && mv.promotion == 0 {
+        // When NOT in check: only captures and promotions (quiet moves skipped).
+        // When in check: generate all legal moves — the king might need to move
+        // or a piece block, not just capture.
+        if !in_check_pos && board.board[mv.to as usize] == EMPTY && mv.promotion == 0 {
 
             continue;
         }
@@ -1632,7 +1640,24 @@ fn search(board: &mut Board, depth: usize, mut alpha: i32, beta: i32, killers: &
 
     let tt_result = TT.probe(zobrist_key);
 
-    if let Some((tt_score, _tt_move_packed, tt_depth, tt_flags)) = tt_result {
+    if let Some((tt_score, tt_move_packed, tt_depth, tt_flags)) = tt_result {
+
+        // Unpack TT best move (used on early returns instead of local zero Move)
+        let tt_best = if tt_move_packed != 0 {
+
+            let (tt_from, tt_to, promo_code) = unpack_move_data(tt_move_packed);
+
+            let tt_promo = decode_promotion(promo_code, board.side_to_move);
+
+            Move {
+                from: tt_from,
+                to: tt_to,
+                promotion: tt_promo,
+            }
+        } else {
+
+            best_move
+        };
 
         if tt_depth as usize >= depth {
 
@@ -1640,20 +1665,20 @@ fn search(board: &mut Board, depth: usize, mut alpha: i32, beta: i32, killers: &
                 // Exact score → return immediately
                 TT_EXACT => {
 
-                    return (tt_score, best_move);
+                    return (tt_score, tt_best);
                 },
                 // Lower bound (beta cutoff) → fail‑high if ≥ beta
                 TT_LOWER => {
                     if tt_score >= beta {
 
-                        return (tt_score, best_move);
+                        return (tt_score, tt_best);
                     }
                 },
                 // Upper bound (no improvement) → fail‑low if ≤ alpha
                 TT_UPPER => {
                     if tt_score <= alpha {
 
-                        return (tt_score, best_move);
+                        return (tt_score, tt_best);
                     }
                 },
                 _ => {},
@@ -1909,9 +1934,16 @@ pub fn best_move(fen: &str, depth: usize) -> Option<String> {
 
     for d in 1..=depth {
 
-        let (_, mv) = search(&mut board, d, -30000, 30000, &mut killers, 0);
+        let (score, mv) = search(&mut board, d, -30000, 30000, &mut killers, 0);
 
-        if mv.from != mv.to || mv.promotion != 0 {
+        let is_valid = mv.from != mv.to || mv.promotion != 0;
+
+        crate::log_msg(format!(
+            "[chess]  depth={d} score={score} best={} valid={is_valid}",
+            if is_valid { square_name(mv.from) + &square_name(mv.to) } else { "none".into() },
+        ));
+
+        if is_valid {
 
             best_move = mv;
         }
@@ -1920,8 +1952,14 @@ pub fn best_move(fen: &str, depth: usize) -> Option<String> {
     // No legal moves (checkmate or stalemate)
     if best_move.from == best_move.to {
 
+        crate::log_msg("[chess]  => None (no valid move found across all depths)".into());
+
         return None;
     }
 
-    Some(format!("{}{}", square_name(best_move.from), square_name(best_move.to)))
+    let result = format!("{}{}", square_name(best_move.from), square_name(best_move.to));
+
+    crate::log_msg(format!("[chess]  => {result}"));
+
+    Some(result)
 }

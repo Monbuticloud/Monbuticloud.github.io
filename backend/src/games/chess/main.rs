@@ -2,8 +2,10 @@
 // No heap allocations inside search/move generation.
 // Uses enums for clarity and constants for demystification.
 
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::LazyLock;
+use std::sync::{
+    LazyLock,
+    atomic::{AtomicU64, Ordering},
+};
 
 // -----------------------------------------------------------------------------
 // Enums and constants
@@ -1239,7 +1241,6 @@ fn quiesce(board: &mut Board, mut alpha: i32, beta: i32) -> i32 {
 struct XorShift64(u64);
 
 impl XorShift64 {
-
     fn next(&mut self) -> u64 {
 
         self.0 ^= self.0 << 13;
@@ -1355,16 +1356,40 @@ fn decode_promotion(code: u8, side: Color) -> i8 {
 
     match code {
         1 => {
-            if side == Color::White { W_QUEEN } else { B_QUEEN }
+            if side == Color::White {
+
+                W_QUEEN
+            } else {
+
+                B_QUEEN
+            }
         },
         2 => {
-            if side == Color::White { W_ROOK } else { B_ROOK }
+            if side == Color::White {
+
+                W_ROOK
+            } else {
+
+                B_ROOK
+            }
         },
         3 => {
-            if side == Color::White { W_BISHOP } else { B_BISHOP }
+            if side == Color::White {
+
+                W_BISHOP
+            } else {
+
+                B_BISHOP
+            }
         },
         4 => {
-            if side == Color::White { W_KNIGHT } else { B_KNIGHT }
+            if side == Color::White {
+
+                W_KNIGHT
+            } else {
+
+                B_KNIGHT
+            }
         },
         _ => 0,
     }
@@ -1382,6 +1407,7 @@ const TT_MASK: usize = (1 << TT_BITS) - 1;
 ///   key:   full 64‑bit Zobrist hash
 ///   data:  score(32) | best_move_packed(16) | depth(8) | flags(8)
 #[repr(C, align(8))]
+
 struct TTEntry {
     key: AtomicU64,
     data: AtomicU64,
@@ -1390,16 +1416,13 @@ struct TTEntry {
 // flags
 const TT_EXACT: u8 = 0;
 
-const TT_LOWER: u8 = 1;  // beta cutoff → score is a lower bound
+const TT_LOWER: u8 = 1; // beta cutoff → score is a lower bound
 
-const TT_UPPER: u8 = 2;  // no move improved alpha → score is an upper bound
+const TT_UPPER: u8 = 2; // no move improved alpha → score is an upper bound
 
 fn pack_tt_data(score: i32, best_move_packed: u16, depth: u8, flags: u8) -> u64 {
 
-    (score as u64) & 0xFFFF_FFFF
-        | ((best_move_packed as u64) << 32)
-        | ((depth as u64) << 48)
-        | ((flags as u64) << 56)
+    (score as u64) & 0xFFFF_FFFF | ((best_move_packed as u64) << 32) | ((depth as u64) << 48) | ((flags as u64) << 56)
 }
 
 fn unpack_tt_data(data: u64) -> (i32, u16, u8, u8) {
@@ -1506,11 +1529,24 @@ fn search(board: &mut Board, depth: usize, mut alpha: i32, beta: i32) -> (i32, M
 
             match tt_flags {
                 // Exact score → return immediately
-                TT_EXACT => { return (tt_score, best_move); },
+                TT_EXACT => {
+
+                    return (tt_score, best_move);
+                },
                 // Lower bound (beta cutoff) → fail‑high if ≥ beta
-                TT_LOWER => { if tt_score >= beta { return (tt_score, best_move); } },
+                TT_LOWER => {
+                    if tt_score >= beta {
+
+                        return (tt_score, best_move);
+                    }
+                },
                 // Upper bound (no improvement) → fail‑low if ≤ alpha
-                TT_UPPER => { if tt_score <= alpha { return (tt_score, best_move); } },
+                TT_UPPER => {
+                    if tt_score <= alpha {
+
+                        return (tt_score, best_move);
+                    }
+                },
                 _ => {},
             }
         }
@@ -1638,9 +1674,16 @@ fn search(board: &mut Board, depth: usize, mut alpha: i32, beta: i32) -> (i32, M
     }
 
     // ── TT store ──
-    let flags = if alpha <= orig_alpha { TT_UPPER }
-                else if alpha >= beta { TT_LOWER }
-                else { TT_EXACT };
+    let flags = if alpha <= orig_alpha {
+
+        TT_UPPER
+    } else if alpha >= beta {
+
+        TT_LOWER
+    } else {
+
+        TT_EXACT
+    };
 
     if best_move.from != best_move.to || best_move.promotion != 0 {
 

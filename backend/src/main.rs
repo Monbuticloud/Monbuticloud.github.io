@@ -1,6 +1,9 @@
+mod games;
+
 use axum::{
     Router,
     body::Body,
+    extract::Query,
     http::{Response, StatusCode, header},
     middleware::{self, Next},
     routing::get,
@@ -72,6 +75,8 @@ fn main() {
             .route("/common.js", get(|| serve_static("static/common.js")))
             //-common.css
             .route("/common.css", get(|| serve_static("static/common.css")))
+            //- chess API
+            .route("/api/games/chess/completions", get(get_chess_completion))
             //-404
             .layer(middleware::from_fn(track_request));
 
@@ -110,10 +115,7 @@ async fn serve_static(path: &'static str) -> Response<Body> {
     let mime = mime_for_path(path);
     let (status, content) = match tokio::fs::read_to_string(path).await {
         Ok(c) => (StatusCode::OK, c),
-        Err(_) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "<h1>Internal Server Error</h1>".into(),
-        ),
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "<h1>Internal Server Error</h1>".into()),
     };
 
     FILE_CACHE
@@ -133,4 +135,37 @@ async fn track_request(request: axum::http::Request<Body>, next: Next) -> Respon
     let time = Utc::now();
     REQUEST_LOG.push((path, time));
     next.run(request).await
+}
+
+// ── Chess API ──
+
+fn json_body(status: StatusCode, body: String) -> Response<Body> {
+    Response::builder()
+        .status(status)
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(body))
+        .unwrap()
+}
+
+/// GET /api/games/chess/completions?fen=...
+///
+/// Fixed depth=6 to avoid CPU-exhaustion via arbitrary depth params.
+/// Runs the sunfish-inspired chess engine on a blocking thread
+/// so the async runtime isn't starved.
+async fn get_chess_completion(params: Query<HashMap<String, String>>) -> Response<Body> {
+    let fen = match params.get("fen") {
+        Some(f) => f,
+        None => return json_body(StatusCode::BAD_REQUEST, r#"{"error":"missing 'fen' query parameter"}"#.into()),
+    };
+
+    let fen = fen.clone();
+    let result = tokio::task::spawn_blocking(move || games::chess::best_move(&fen, 6)).await;
+
+    match result {
+        Ok(Some(best_move)) => json_body(StatusCode::OK, format!(r#"{{"best_move":"{best_move}"}}"#)),
+        Ok(None) => json_body(StatusCode::BAD_REQUEST, r#"{"error":"no legal moves or invalid FEN"}"#.into()),
+        Err(join_err) => {
+            json_body(StatusCode::INTERNAL_SERVER_ERROR, format!(r#"{{"error":"search panicked: {join_err}"}}"#))
+        },
+    }
 }

@@ -741,7 +741,9 @@ fn unmake_move(board: &mut Board, mv: Move, undo: MoveUndo) {
 
     // Switch back to the side that made the move
     board.side_to_move = opponent;
-    if board.side_to_move == Color::White {
+    // mirror of make_move: increment happened when switching TO White,
+    // so decrement when undoing from White
+    if current_side == Color::White {
         board.fullmove_number -= 1;
     }
 

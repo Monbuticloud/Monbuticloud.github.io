@@ -2,6 +2,9 @@
 // No heap allocations inside search/move generation.
 // Uses enums for clarity and constants for demystification.
 
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::LazyLock;
+
 // -----------------------------------------------------------------------------
 // Enums and constants
 // -----------------------------------------------------------------------------
@@ -1230,7 +1233,249 @@ fn quiesce(board: &mut Board, mut alpha: i32, beta: i32) -> i32 {
 }
 
 // -----------------------------------------------------------------------------
-// Search (Negamax with alpha-beta)
+// Zobrist hashing (for transposition table)
+// -----------------------------------------------------------------------------
+
+struct XorShift64(u64);
+
+impl XorShift64 {
+
+    fn next(&mut self) -> u64 {
+
+        self.0 ^= self.0 << 13;
+
+        self.0 ^= self.0 >> 7;
+
+        self.0 ^= self.0 << 17;
+
+        self.0
+    }
+}
+
+struct Zobrist {
+    keys: [u64; 781],
+}
+
+impl Zobrist {
+    fn new() -> Self {
+
+        let mut rng = XorShift64(12_345_678_901_234_567);
+
+        let mut keys = [0u64; 781];
+
+        for k in keys.iter_mut() {
+
+            *k = rng.next();
+        }
+
+        Zobrist { keys }
+    }
+
+    fn hash(&self, board: &Board) -> u64 {
+
+        let mut h = 0u64;
+
+        for sq in 0..64u8 {
+
+            let piece = board.board[sq as usize];
+
+            if piece != EMPTY {
+
+                let pt = piece.unsigned_abs() as usize - 1; // 0..5
+
+                let color = if piece > 0 { 0usize } else { 1usize };
+
+                h ^= self.keys[(pt * 2 + color) * 64 + sq as usize];
+            }
+        }
+
+        if board.side_to_move == Color::Black {
+
+            h ^= self.keys[768];
+        }
+
+        const CASTLING_BITS: [(u8, usize); 4] = [
+            (CASTLING_WK, 769),
+            (CASTLING_WQ, 770),
+            (CASTLING_BK, 771),
+            (CASTLING_BQ, 772),
+        ];
+
+        for &(bit, idx) in &CASTLING_BITS {
+
+            if board.castling_rights & bit != 0 {
+
+                h ^= self.keys[idx];
+            }
+        }
+
+        if board.en_passant_square != -1 {
+
+            let file = (board.en_passant_square as usize) & 7;
+
+            h ^= self.keys[773 + file];
+        }
+
+        h
+    }
+}
+
+static ZOBRIST: LazyLock<Zobrist> = LazyLock::new(Zobrist::new);
+
+// -----------------------------------------------------------------------------
+// Move packing for TT storage (16 bits: from:6, to:6, promo:4)
+// -----------------------------------------------------------------------------
+
+fn pack_move_data(mv: &Move) -> u16 {
+
+    let promo_code = match mv.promotion {
+        0 => 0u8,
+        W_QUEEN | B_QUEEN => 1,
+        W_ROOK | B_ROOK => 2,
+        W_BISHOP | B_BISHOP => 3,
+        W_KNIGHT | B_KNIGHT => 4,
+        _ => 0,
+    };
+
+    (mv.from as u16) | ((mv.to as u16) << 6) | ((promo_code as u16) << 12)
+}
+
+fn unpack_move_data(packed: u16) -> (u8, u8, u8) {
+
+    let from = (packed & 0x3F) as u8;
+
+    let to = ((packed >> 6) & 0x3F) as u8;
+
+    let promo_code = ((packed >> 12) & 0xF) as u8;
+
+    (from, to, promo_code)
+}
+
+fn decode_promotion(code: u8, side: Color) -> i8 {
+
+    match code {
+        1 => {
+            if side == Color::White { W_QUEEN } else { B_QUEEN }
+        },
+        2 => {
+            if side == Color::White { W_ROOK } else { B_ROOK }
+        },
+        3 => {
+            if side == Color::White { W_BISHOP } else { B_BISHOP }
+        },
+        4 => {
+            if side == Color::White { W_KNIGHT } else { B_KNIGHT }
+        },
+        _ => 0,
+    }
+}
+
+// -----------------------------------------------------------------------------
+// Transposition table (lock‑free, 8 MB ≈ 2^19 entries, depth‑preferred eviction)
+// -----------------------------------------------------------------------------
+
+const TT_BITS: usize = 19; // 2^19 = 524 288 entries × 16 bytes ≈ 8 MB
+
+const TT_MASK: usize = (1 << TT_BITS) - 1;
+
+/// Single TT entry packed into two atomics:
+///   key:   full 64‑bit Zobrist hash
+///   data:  score(32) | best_move_packed(16) | depth(8) | flags(8)
+#[repr(C, align(8))]
+struct TTEntry {
+    key: AtomicU64,
+    data: AtomicU64,
+}
+
+// flags
+const TT_EXACT: u8 = 0;
+
+const TT_LOWER: u8 = 1;  // beta cutoff → score is a lower bound
+
+const TT_UPPER: u8 = 2;  // no move improved alpha → score is an upper bound
+
+fn pack_tt_data(score: i32, best_move_packed: u16, depth: u8, flags: u8) -> u64 {
+
+    (score as u64) & 0xFFFF_FFFF
+        | ((best_move_packed as u64) << 32)
+        | ((depth as u64) << 48)
+        | ((flags as u64) << 56)
+}
+
+fn unpack_tt_data(data: u64) -> (i32, u16, u8, u8) {
+
+    let score = (data & 0xFFFF_FFFF) as u32 as i32;
+
+    let best_move_packed = ((data >> 32) & 0xFFFF) as u16;
+
+    let depth = ((data >> 48) & 0xFF) as u8;
+
+    let flags = ((data >> 56) & 0xFF) as u8;
+
+    (score, best_move_packed, depth, flags)
+}
+
+struct TranspositionTable {
+    entries: Box<[TTEntry]>,
+}
+
+impl TranspositionTable {
+    fn new() -> Self {
+
+        let count = 1 << TT_BITS;
+
+        let mut vec = Vec::with_capacity(count);
+
+        vec.resize_with(count, || TTEntry {
+            key: AtomicU64::new(0),
+            data: AtomicU64::new(0),
+        });
+
+        TranspositionTable {
+            entries: vec.into_boxed_slice(),
+        }
+    }
+
+    fn probe(&self, zobrist: u64) -> Option<(i32, u16, u8, u8)> {
+
+        let entry = &self.entries[(zobrist as usize) & TT_MASK];
+
+        let stored_key = entry.key.load(Ordering::Acquire);
+
+        if stored_key != zobrist {
+
+            return None;
+        }
+
+        let data = entry.data.load(Ordering::Relaxed);
+
+        Some(unpack_tt_data(data))
+    }
+
+    fn store(&self, zobrist: u64, score: i32, best_move_packed: u16, depth: u8, flags: u8) {
+
+        let entry = &self.entries[(zobrist as usize) & TT_MASK];
+
+        let new_data = pack_tt_data(score, best_move_packed, depth, flags);
+
+        let old_data = entry.data.load(Ordering::Relaxed);
+
+        // Depth‑preferred replacement: deeper searches overwrite shallower ones
+        if old_data != 0 && unpack_tt_data(old_data).2 > depth {
+
+            return;
+        }
+
+        entry.data.store(new_data, Ordering::Relaxed);
+
+        entry.key.store(zobrist, Ordering::Release);
+    }
+}
+
+static TT: LazyLock<TranspositionTable> = LazyLock::new(TranspositionTable::new);
+
+// -----------------------------------------------------------------------------
+// Search (Negamax with alpha-beta + TT)
 // -----------------------------------------------------------------------------
 
 fn search(board: &mut Board, depth: usize, mut alpha: i32, beta: i32) -> (i32, Move) {
@@ -1241,11 +1486,40 @@ fn search(board: &mut Board, depth: usize, mut alpha: i32, beta: i32) -> (i32, M
         promotion: 0,
     };
 
+    let orig_alpha = alpha;
+
     if depth == 0 {
 
         let score = quiesce(board, alpha, beta);
 
         return (score, best_move);
+    }
+
+    // ── TT probe ──
+    let zobrist_key = ZOBRIST.hash(board);
+
+    let tt_result = TT.probe(zobrist_key);
+
+    if let Some((tt_score, _tt_move_packed, tt_depth, tt_flags)) = tt_result {
+
+        if tt_depth as usize >= depth {
+
+            match tt_flags {
+                // Exact score → return immediately
+                TT_EXACT => { return (tt_score, best_move); },
+                // Lower bound (beta cutoff) → fail‑high if ≥ beta
+                TT_LOWER => { if tt_score >= beta { return (tt_score, best_move); } },
+                // Upper bound (no improvement) → fail‑low if ≤ alpha
+                TT_UPPER => { if tt_score <= alpha { return (tt_score, best_move); } },
+                _ => {},
+            }
+        }
+
+        // Adjust alpha upward using stored lower bound
+        if tt_flags == TT_LOWER && tt_score > alpha {
+
+            alpha = tt_score;
+        }
     }
 
     let mut pseudo_moves = generate_pseudo_legal_moves(board);
@@ -1260,6 +1534,29 @@ fn search(board: &mut Board, depth: usize, mut alpha: i32, beta: i32) -> (i32, M
         } else {
 
             return (0, best_move);
+        }
+    }
+
+    // ── TT best‑move ordering: promote to position 0 ──
+    if let Some((_, tt_move_packed, _, _)) = tt_result {
+
+        if tt_move_packed != 0 {
+
+            let (tt_from, tt_to, promo_code) = unpack_move_data(tt_move_packed);
+
+            let tt_promo = decode_promotion(promo_code, board.side_to_move);
+
+            for i in 0..pseudo_moves.count {
+
+                let mv = pseudo_moves.moves[i];
+
+                if mv.from == tt_from && mv.to == tt_to && mv.promotion == tt_promo {
+
+                    pseudo_moves.moves.swap(0, i);
+
+                    break;
+                }
+            }
         }
     }
 
@@ -1338,6 +1635,16 @@ fn search(board: &mut Board, depth: usize, mut alpha: i32, beta: i32) -> (i32, M
                 break;
             }
         }
+    }
+
+    // ── TT store ──
+    let flags = if alpha <= orig_alpha { TT_UPPER }
+                else if alpha >= beta { TT_LOWER }
+                else { TT_EXACT };
+
+    if best_move.from != best_move.to || best_move.promotion != 0 {
+
+        TT.store(zobrist_key, alpha, pack_move_data(&best_move), depth as u8, flags);
     }
 
     (alpha, best_move)

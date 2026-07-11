@@ -21,7 +21,11 @@ use std::{
 use tokio::runtime::Builder;
 use tower_http::services::ServeDir;
 
-static REQUEST_LOG: LazyLock<SegQueue<(String, DateTime<Utc>)>> = LazyLock::new(SegQueue::new);
+pub(crate) static LOG_BUFFER: LazyLock<SegQueue<(String, DateTime<Utc>)>> = LazyLock::new(SegQueue::new);
+
+pub(crate) fn log_msg(msg: String) {
+    LOG_BUFFER.push((msg, Utc::now()));
+}
 
 static FILE_CACHE: LazyLock<RwLock<HashMap<&'static str, (StatusCode, String, &'static mime::Mime)>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
@@ -38,7 +42,7 @@ fn main() {
 
             let mut buf = String::new();
 
-            while let Some((path, time)) = REQUEST_LOG.pop() {
+            while let Some((path, time)) = LOG_BUFFER.pop() {
 
                 use std::fmt::Write;
 
@@ -161,7 +165,7 @@ async fn track_request(request: axum::http::Request<Body>, next: Next) -> Respon
 
     let time = Utc::now();
 
-    REQUEST_LOG.push((path, time));
+    LOG_BUFFER.push((path, time));
 
     next.run(request).await
 }

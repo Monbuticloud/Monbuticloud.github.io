@@ -1873,6 +1873,13 @@ pub fn best_move(fen: &str, depth: usize) -> Option<String> {
         Err(_) => return None,
     };
 
+    crate::log_msg(format!(
+        "[chess] TT={} entries, depth={}, fen={}",
+        1 << TT_BITS,
+        depth,
+        fen,
+    ));
+
     // Iterative deepening: search depth 1→N so each level warms the TT
     // for the next. This gives near‑optimal move ordering at the target depth.
     // Killers persist across iterations for better ordering.

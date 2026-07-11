@@ -1614,7 +1614,7 @@ fn search(board: &mut Board, depth: usize, mut alpha: i32, beta: i32) -> (i32, M
     }
 
     // ── Null move pruning (skip a turn; if score still ≥ beta, prune) ──
-    if depth >= 3 && !in_check(board) && beta - alpha <= 400 {
+    if depth >= 3 && !in_check(board) {
 
         let saved_ep = board.en_passant_square;
 

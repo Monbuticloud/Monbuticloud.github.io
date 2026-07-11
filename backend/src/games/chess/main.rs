@@ -336,12 +336,11 @@ impl MoveList {
 
     fn push(&mut self, mv: Move) {
 
-        if self.count < MAX_MOVES {
+        debug_assert!(self.count < MAX_MOVES, "MoveList overflow");
 
-            self.moves[self.count] = mv;
+        self.moves[self.count] = mv;
 
-            self.count += 1;
-        }
+        self.count += 1;
     }
 }
 

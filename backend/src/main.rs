@@ -67,6 +67,26 @@ static FILE_CACHE: LazyLock<RwLock<HashMap<&'static str, (StatusCode, String, &'
     LazyLock::new(|| RwLock::new(HashMap::new()));
 
 fn main() {
+    // ── Panic hook: flush buffered logs before the process goes down ──
+    let prev = std::panic::take_hook();
+
+    std::panic::set_hook(Box::new(move |info| {
+        let mut buf = String::new();
+
+        while let Some((msg, level, time)) = LOG_BUFFER.pop() {
+            use std::fmt::Write;
+
+            let _ = writeln!(buf, "[{}] [{:>5}] {}", time.format("%H:%M:%S"), level.to_string(), msg);
+        }
+
+        if !buf.is_empty() {
+            let _ = std::io::stdout().write_all(buf.as_bytes());
+            let _ = std::io::stdout().flush();
+        }
+
+        prev(info);
+    }));
+
     // ── Background flusher: drain queue to stdout every 500ms,
     //    or immediately when 10 000+ items pile up ──
     let ticker = crossbeam::channel::tick(Duration::from_millis(500));

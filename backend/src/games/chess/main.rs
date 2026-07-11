@@ -1764,6 +1764,16 @@ fn search(board: &mut Board, depth: usize, mut alpha: i32, beta: i32, killers: &
 
         let saved_ep = board.en_passant_square;
 
+        let saved_hash = board.hash;
+
+        // Sync hash for the null-move state (side toggle + ep clear)
+        board.hash ^= ZOBRIST.keys[768];
+
+        if saved_ep != -1 {
+
+            board.hash ^= ZOBRIST.keys[773 + (saved_ep as usize & 7)];
+        }
+
         board.en_passant_square = -1;
 
         board.side_to_move = board.side_to_move.opposite();
@@ -1773,6 +1783,8 @@ fn search(board: &mut Board, depth: usize, mut alpha: i32, beta: i32, killers: &
         board.side_to_move = board.side_to_move.opposite();
 
         board.en_passant_square = saved_ep;
+
+        board.hash = saved_hash;
 
         if null_score >= beta {
 

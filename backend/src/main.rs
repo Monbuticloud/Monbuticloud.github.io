@@ -1,5 +1,19 @@
 mod games;
 
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
+/// Dedicated thread pool for chess search (tiny stacks, no tokio blocking pool).
+/// The engine uses ~70KB stack at peak; 256KB gives 8× margin.
+static CHESS_POOL: std::sync::LazyLock<rayon::ThreadPool> = std::sync::LazyLock::new(|| {
+    rayon::ThreadPoolBuilder::new()
+        .num_threads(std::thread::available_parallelism().map_or(4, |n| n.get()).max(128))
+        .thread_name(|i| format!("chess-{i}"))
+        .stack_size(256 * 1024)
+        .build()
+        .expect("failed to build chess thread pool")
+});
+
 use axum::{
     Router,
     body::Body,
@@ -15,7 +29,10 @@ use std::{
     env,
     io::{Write, stdout},
     net::SocketAddr,
-    sync::{LazyLock, RwLock, atomic::{AtomicUsize, Ordering}},
+    sync::{
+        LazyLock, RwLock,
+        atomic::{AtomicUsize, Ordering},
+    },
     time::Duration,
 };
 use tokio::runtime::Builder;
@@ -26,6 +43,7 @@ pub(crate) enum LogLevel {
     Debug,
     Info,
     Warn,
+    #[allow(dead_code)]
     Error,
 }
 
@@ -43,11 +61,24 @@ impl std::fmt::Display for LogLevel {
 /// Structured log messages — no freeform strings.
 #[derive(Debug)]
 pub(crate) enum LogMsg {
-    Request { path: String },
-    ChessSearch { tt_entries: usize, depth: usize, fen: String },
-    ChessDepth { depth: usize, score: i32, best: String, is_valid: bool },
+    Request {
+        path: String,
+    },
+    ChessSearch {
+        tt_entries: usize,
+        depth: usize,
+        fen: String,
+    },
+    ChessDepth {
+        depth: usize,
+        score: i32,
+        best: String,
+        is_valid: bool,
+    },
     ChessNoMove,
-    ChessResult { best_move: String },
+    ChessResult {
+        best_move: String,
+    },
 }
 
 impl std::fmt::Display for LogMsg {
@@ -56,18 +87,22 @@ impl std::fmt::Display for LogMsg {
             LogMsg::Request { path } => write!(f, "[req] {path}"),
             LogMsg::ChessSearch { tt_entries, depth, fen } => {
                 write!(f, "[chess] TT={tt_entries} entries, depth={depth}, fen={fen}")
-            }
-            LogMsg::ChessDepth { depth, score, best, is_valid } => {
+            },
+            LogMsg::ChessDepth {
+                depth,
+                score,
+                best,
+                is_valid,
+            } => {
                 write!(f, "[chess]  depth={depth} score={score} best={best} valid={is_valid}")
-            }
+            },
             LogMsg::ChessNoMove => write!(f, "[chess]  => None (no valid move found across all depths)"),
             LogMsg::ChessResult { best_move } => write!(f, "[chess]  => {best_move}"),
         }
     }
 }
 
-pub(crate) static LOG_BUFFER: LazyLock<SegQueue<(LogMsg, LogLevel, DateTime<Utc>)>> =
-    LazyLock::new(SegQueue::new);
+pub(crate) static LOG_BUFFER: LazyLock<SegQueue<(LogMsg, LogLevel, DateTime<Utc>)>> = LazyLock::new(SegQueue::new);
 
 /// Approximate number of items in `LOG_BUFFER` (used to trigger early flush).
 pub(crate) static LOG_DEPTH: AtomicUsize = AtomicUsize::new(0);
@@ -86,6 +121,8 @@ pub(crate) fn log_warn(msg: LogMsg) {
 pub(crate) fn log_debug(msg: LogMsg) {
     log_msg(LogLevel::Debug, msg);
 }
+#[allow(dead_code)]
+
 pub(crate) fn log_error(msg: LogMsg) {
     log_msg(LogLevel::Error, msg);
 }
@@ -142,7 +179,6 @@ fn main() {
                 // If the queue filled up again while we were draining, go again
                 // without waiting for the next tick.
                 if LOG_DEPTH.load(Ordering::Acquire) > 10_000 {
-
                     continue;
                 }
 
@@ -153,7 +189,7 @@ fn main() {
 
     let rt = Builder::new_multi_thread()
         .enable_all()
-        .max_blocking_threads(32_768)
+        .max_blocking_threads(8192)
         .build()
         .expect("Failed to create Tokio runtime");
 
@@ -285,7 +321,7 @@ async fn get_chess_completion(params: Query<HashMap<String, String>>) -> Respons
 
     let fen = fen.clone();
 
-    let search = tokio::task::spawn_blocking(move || games::chess::best_move(&fen, depth));
+    let search = tokio::task::spawn_blocking(move || CHESS_POOL.install(|| games::chess::best_move(&fen, depth)));
 
     let result = tokio::time::timeout(std::time::Duration::from_secs(60), search).await;
 

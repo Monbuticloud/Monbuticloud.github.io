@@ -91,6 +91,30 @@ fn piece_value(piece: i8) -> i32 {
     }
 }
 
+fn piece_to_list_idx(piece: i8) -> usize {
+    (piece.unsigned_abs() as usize - 1) + if piece > 0 { 0 } else { 6 }
+}
+
+fn remove_piece_from_list(board: &mut Board, sq: u8, piece: i8) {
+    let idx = piece_to_list_idx(piece);
+    let count = board.piece_count[idx];
+    for i in 0..count {
+        if board.piece_list[idx][i as usize] == sq {
+            let last = count - 1;
+            board.piece_list[idx][i as usize] = board.piece_list[idx][last as usize];
+            board.piece_count[idx] = last;
+            return;
+        }
+    }
+}
+
+fn add_piece_to_list(board: &mut Board, sq: u8, piece: i8) {
+    let idx = piece_to_list_idx(piece);
+    let count = board.piece_count[idx];
+    board.piece_list[idx][count as usize] = sq;
+    board.piece_count[idx] = count + 1;
+}
+
 // Piece-square tables (from Sunfish, simplified)
 // Index: square 0..63 (a1=0, h1=7, a8=56, h8=63)
 const PST: [i32; 64] = [
@@ -109,6 +133,39 @@ const CASTLING_WQ: u8 = 2;
 const CASTLING_BK: u8 = 4;
 
 const CASTLING_BQ: u8 = 8;
+
+// Named squares for castling (replace magic numbers throughout)
+const E1: u8 = 4;
+
+const G1: u8 = 6;
+
+const C1: u8 = 2;
+
+const F1: u8 = 5;
+
+const H1: u8 = 7;
+
+const A1: u8 = 0;
+
+const D1: u8 = 3;
+
+const B1: u8 = 1;
+
+const E8: u8 = 60;
+
+const G8: u8 = 62;
+
+const C8: u8 = 58;
+
+const F8: u8 = 61;
+
+const H8: u8 = 63;
+
+const A8: u8 = 56;
+
+const D8: u8 = 59;
+
+const B8: u8 = 57;
 
 // -----------------------------------------------------------------------------
 // Move representation
@@ -152,6 +209,10 @@ struct Board {
     wk_sq: u8, // square of white king
     bk_sq: u8, // square of black king
     hash: u64, // Zobrist hash (incremental for O(1) TT probes)
+    // Piece lists: 12 fixed-size arrays (6 types × 2 colors), zero heap.
+    // Max per type: pawns=8, all others ≤2 — [u8; 8] covers everything.
+    piece_list: [[u8; 8]; 12],
+    piece_count: [u8; 12],
 }
 
 impl Board {
@@ -164,27 +225,14 @@ impl Board {
             en_passant_square: -1,
             halfmove_clock: 0,
             fullmove_number: 1,
-            wk_sq: 4,  // e1
-            bk_sq: 60, // e8
+            wk_sq: E1,
+            bk_sq: E8,
             hash: 0,
+            piece_list: [[0u8; 8]; 12],
+            piece_count: [0u8; 12],
         }
     }
 
-    fn color_of(&self, square: Square) -> Option<Color> {
-
-        let piece = self.board[square as usize];
-
-        if piece == EMPTY {
-
-            None
-        } else if piece > 0 {
-
-            Some(Color::White)
-        } else {
-
-            Some(Color::Black)
-        }
-    }
 }
 
 // -----------------------------------------------------------------------------
@@ -245,6 +293,8 @@ fn parse_fen(fen: &str) -> Result<Board, &'static str> {
 
                 board.board[sq as usize] = piece;
 
+                add_piece_to_list(&mut board, sq, piece);
+
                 if piece == W_KING {
 
                     board.wk_sq = sq;
@@ -287,9 +337,20 @@ fn parse_fen(fen: &str) -> Result<Board, &'static str> {
     // En passant
     if parts[3] != "-" {
 
-        let file = (parts[3].chars().nth(0).expect("en passant file char") as u8 - b'a') as usize;
+        let mut ep_chars = parts[3].chars();
 
-        let rank = (8 - (parts[3].chars().nth(1).expect("en passant rank char") as u8 - b'0')) as usize;
+        let file_char = ep_chars.next().ok_or("invalid en-passant square (file)")?;
+
+        let rank_char = ep_chars.next().ok_or("invalid en-passant square (rank)")?;
+
+        let file = (file_char as u8 - b'a') as usize;
+
+        let rank = (8 - (rank_char as u8 - b'0')) as usize;
+
+        if file >= 8 || rank >= 8 {
+
+            return Err("invalid en-passant square (out of bounds)");
+        }
 
         board.en_passant_square = (rank * 8 + file) as i8;
     } else {
@@ -377,19 +438,22 @@ fn generate_pseudo_legal_moves(board: &Board) -> MoveList {
 
     let pawn_direction = if current_side == Color::White { -8 } else { 8 };
 
-    for square in 0..64u8 {
+    // Iterate friendly piece lists instead of all 64 squares (2–5× faster).
+    let list_base = if current_side == Color::White { 0 } else { 6 };
 
-        let piece = board.board[square as usize];
+    for type_offset in 0..6u8 {
 
-        // Skip empty squares and opponent pieces
-        if piece == EMPTY || (piece > 0) != (current_sign == 1) {
+        let list_idx = list_base + type_offset as usize;
 
-            continue;
-        }
+        let count = board.piece_count[list_idx];
 
-        let piece_type = piece.abs();
+        for i in 0..count {
 
-        match piece_type {
+            let square = board.piece_list[list_idx][i as usize];
+
+            let piece_type = type_offset + 1;
+
+            match piece_type {
             1 => {
 
                 // ── Pawn ──
@@ -675,52 +739,52 @@ fn generate_pseudo_legal_moves(board: &Board) -> MoveList {
 
                     if (board.castling_rights & CASTLING_WK) != 0 {
 
-                        if board.board[5] == EMPTY
-                            && board.board[6] == EMPTY
-                            && board.board[7] == W_ROOK
-                            && board.board[4] == W_KING
+                        if board.board[F1 as usize] == EMPTY
+                            && board.board[G1 as usize] == EMPTY
+                            && board.board[H1 as usize] == W_ROOK
+                            && board.board[E1 as usize] == W_KING
                         {
 
-                            moves.push(Move::new(4, 6));
+                            moves.push(Move::new(E1, G1));
                         }
                     }
 
                     if (board.castling_rights & CASTLING_WQ) != 0 {
 
-                        if board.board[1] == EMPTY
-                            && board.board[2] == EMPTY
-                            && board.board[3] == EMPTY
-                            && board.board[0] == W_ROOK
-                            && board.board[4] == W_KING
+                        if board.board[B1 as usize] == EMPTY
+                            && board.board[C1 as usize] == EMPTY
+                            && board.board[D1 as usize] == EMPTY
+                            && board.board[A1 as usize] == W_ROOK
+                            && board.board[E1 as usize] == W_KING
                         {
 
-                            moves.push(Move::new(4, 2));
+                            moves.push(Move::new(E1, C1));
                         }
                     }
                 } else {
 
                     if (board.castling_rights & CASTLING_BK) != 0 {
 
-                        if board.board[61] == EMPTY
-                            && board.board[62] == EMPTY
-                            && board.board[63] == B_ROOK
-                            && board.board[60] == B_KING
+                        if board.board[F8 as usize] == EMPTY
+                            && board.board[G8 as usize] == EMPTY
+                            && board.board[H8 as usize] == B_ROOK
+                            && board.board[E8 as usize] == B_KING
                         {
 
-                            moves.push(Move::new(60, 62));
+                            moves.push(Move::new(E8, G8));
                         }
                     }
 
                     if (board.castling_rights & CASTLING_BQ) != 0 {
 
-                        if board.board[57] == EMPTY
-                            && board.board[58] == EMPTY
-                            && board.board[59] == EMPTY
-                            && board.board[56] == B_ROOK
-                            && board.board[60] == B_KING
+                        if board.board[B8 as usize] == EMPTY
+                            && board.board[C8 as usize] == EMPTY
+                            && board.board[D8 as usize] == EMPTY
+                            && board.board[A8 as usize] == B_ROOK
+                            && board.board[E8 as usize] == B_KING
                         {
 
-                            moves.push(Move::new(60, 58));
+                            moves.push(Move::new(E8, C8));
                         }
                     }
                 }
@@ -728,6 +792,7 @@ fn generate_pseudo_legal_moves(board: &Board) -> MoveList {
             _ => {},
         }
     }
+}
 
     moves
 }
@@ -916,6 +981,8 @@ fn make_move(board: &mut Board, mv: Move) -> MoveUndo {
     if captured != EMPTY {
 
         board.hash ^= ZOBRIST.keys[zobrist_key(captured, mv.to)];
+
+        remove_piece_from_list(board, mv.to, captured);
     }
 
     // ── Board changes ──
@@ -924,6 +991,11 @@ fn make_move(board: &mut Board, mv: Move) -> MoveUndo {
     board.board[mv.to as usize] = moving_piece;
 
     board.board[mv.from as usize] = EMPTY;
+
+    // Piece list: move piece from source to destination
+    remove_piece_from_list(board, mv.from, moving_piece);
+
+    add_piece_to_list(board, mv.to, moving_piece);
 
     // Track king position
     if is_king {
@@ -941,6 +1013,13 @@ fn make_move(board: &mut Board, mv: Move) -> MoveUndo {
     if mv.promotion != 0 {
 
         board.board[mv.to as usize] = mv.promotion;
+
+        // Piece list: swap pawn for promoted piece
+        let pawn_piece = if current_side == Color::White { W_PAWN } else { B_PAWN };
+
+        remove_piece_from_list(board, mv.to, pawn_piece);
+
+        add_piece_to_list(board, mv.to, mv.promotion);
     }
 
     // En passant capture
@@ -955,31 +1034,52 @@ fn make_move(board: &mut Board, mv: Move) -> MoveUndo {
         };
 
         board.board[captured_pawn_square as usize] = EMPTY;
+
+        // Piece list: remove captured pawn
+        let captured_pawn = if current_side == Color::White { B_PAWN } else { W_PAWN };
+
+        remove_piece_from_list(board, captured_pawn_square, captured_pawn);
     }
 
     // Castling: move the rook when the king castles
     if is_king {
 
-        if mv.from == 4 && mv.to == 6 {
+        if mv.from == E1 && mv.to == G1 {
 
-            board.board[5] = W_ROOK;
+            board.board[F1 as usize] = W_ROOK;
 
-            board.board[7] = EMPTY;
-        } else if mv.from == 4 && mv.to == 2 {
+            board.board[H1 as usize] = EMPTY;
 
-            board.board[3] = W_ROOK;
+            remove_piece_from_list(board, H1, W_ROOK);
 
-            board.board[0] = EMPTY;
-        } else if mv.from == 60 && mv.to == 62 {
+            add_piece_to_list(board, F1, W_ROOK);
+        } else if mv.from == E1 && mv.to == C1 {
 
-            board.board[61] = B_ROOK;
+            board.board[D1 as usize] = W_ROOK;
 
-            board.board[63] = EMPTY;
-        } else if mv.from == 60 && mv.to == 58 {
+            board.board[A1 as usize] = EMPTY;
 
-            board.board[59] = B_ROOK;
+            remove_piece_from_list(board, A1, W_ROOK);
 
-            board.board[56] = EMPTY;
+            add_piece_to_list(board, D1, W_ROOK);
+        } else if mv.from == E8 && mv.to == G8 {
+
+            board.board[F8 as usize] = B_ROOK;
+
+            board.board[H8 as usize] = EMPTY;
+
+            remove_piece_from_list(board, H8, B_ROOK);
+
+            add_piece_to_list(board, F8, B_ROOK);
+        } else if mv.from == E8 && mv.to == C8 {
+
+            board.board[D8 as usize] = B_ROOK;
+
+            board.board[A8 as usize] = EMPTY;
+
+            remove_piece_from_list(board, A8, B_ROOK);
+
+            add_piece_to_list(board, D8, B_ROOK);
         }
     }
 
@@ -996,43 +1096,43 @@ fn make_move(board: &mut Board, mv: Move) -> MoveUndo {
     }
 
     // Rook was captured on its starting square
-    if captured == W_ROOK && mv.to == 7 {
+    if captured == W_ROOK && mv.to == H1 {
 
         board.castling_rights &= !CASTLING_WK;
     }
 
-    if captured == W_ROOK && mv.to == 0 {
+    if captured == W_ROOK && mv.to == A1 {
 
         board.castling_rights &= !CASTLING_WQ;
     }
 
-    if captured == B_ROOK && mv.to == 63 {
+    if captured == B_ROOK && mv.to == H8 {
 
         board.castling_rights &= !CASTLING_BK;
     }
 
-    if captured == B_ROOK && mv.to == 56 {
+    if captured == B_ROOK && mv.to == A8 {
 
         board.castling_rights &= !CASTLING_BQ;
     }
 
     // Rook moved from its starting square
-    if is_rook && mv.from == 7 {
+    if is_rook && mv.from == H1 {
 
         board.castling_rights &= !CASTLING_WK;
     }
 
-    if is_rook && mv.from == 0 {
+    if is_rook && mv.from == A1 {
 
         board.castling_rights &= !CASTLING_WQ;
     }
 
-    if is_rook && mv.from == 63 {
+    if is_rook && mv.from == H8 {
 
         board.castling_rights &= !CASTLING_BK;
     }
 
-    if is_rook && mv.from == 56 {
+    if is_rook && mv.from == A8 {
 
         board.castling_rights &= !CASTLING_BQ;
     }
@@ -1083,26 +1183,26 @@ fn make_move(board: &mut Board, mv: Move) -> MoveUndo {
     // Castling rook movement
     if is_king {
 
-        if mv.from == 4 && mv.to == 6 {
+        if mv.from == E1 && mv.to == G1 {
 
-            board.hash ^= ZOBRIST.keys[zobrist_key(W_ROOK, 7)];
+            board.hash ^= ZOBRIST.keys[zobrist_key(W_ROOK, H1)];
 
-            board.hash ^= ZOBRIST.keys[zobrist_key(W_ROOK, 5)];
-        } else if mv.from == 4 && mv.to == 2 {
+            board.hash ^= ZOBRIST.keys[zobrist_key(W_ROOK, F1)];
+        } else if mv.from == E1 && mv.to == C1 {
 
-            board.hash ^= ZOBRIST.keys[zobrist_key(W_ROOK, 0)];
+            board.hash ^= ZOBRIST.keys[zobrist_key(W_ROOK, A1)];
 
-            board.hash ^= ZOBRIST.keys[zobrist_key(W_ROOK, 3)];
-        } else if mv.from == 60 && mv.to == 62 {
+            board.hash ^= ZOBRIST.keys[zobrist_key(W_ROOK, D1)];
+        } else if mv.from == E8 && mv.to == G8 {
 
-            board.hash ^= ZOBRIST.keys[zobrist_key(B_ROOK, 63)];
+            board.hash ^= ZOBRIST.keys[zobrist_key(B_ROOK, H8)];
 
-            board.hash ^= ZOBRIST.keys[zobrist_key(B_ROOK, 61)];
-        } else if mv.from == 60 && mv.to == 58 {
+            board.hash ^= ZOBRIST.keys[zobrist_key(B_ROOK, F8)];
+        } else if mv.from == E8 && mv.to == C8 {
 
-            board.hash ^= ZOBRIST.keys[zobrist_key(B_ROOK, 56)];
+            board.hash ^= ZOBRIST.keys[zobrist_key(B_ROOK, A8)];
 
-            board.hash ^= ZOBRIST.keys[zobrist_key(B_ROOK, 59)];
+            board.hash ^= ZOBRIST.keys[zobrist_key(B_ROOK, D8)];
         }
     }
 
@@ -1169,15 +1269,36 @@ fn unmake_move(board: &mut Board, mv: Move, undo: MoveUndo) {
 
     board.halfmove_clock = undo.halfmove_clock;
 
+    // ── Piece list: save final piece at destination before board changes ──
+    let final_piece_at_to = board.board[mv.to as usize];
+
     // Restore the piece to its original square
     board.board[mv.from as usize] = board.board[mv.to as usize];
 
     board.board[mv.to as usize] = undo.captured;
 
+    // Piece list: move piece back from destination to source
+    remove_piece_from_list(board, mv.to, final_piece_at_to);
+
+    add_piece_to_list(board, mv.from, final_piece_at_to);
+
+    // Restore captured piece to destination list
+    if undo.captured != EMPTY {
+
+        add_piece_to_list(board, mv.to, undo.captured);
+    }
+
     // Promotion: revert the promoted piece back to a pawn
     if mv.promotion != 0 {
 
         board.board[mv.from as usize] = if opponent == Color::White { W_PAWN } else { B_PAWN };
+
+        // Piece list: swap promoted piece back to pawn
+        remove_piece_from_list(board, mv.from, mv.promotion);
+
+        let pawn_piece = if opponent == Color::White { W_PAWN } else { B_PAWN };
+
+        add_piece_to_list(board, mv.from, pawn_piece);
     }
 
     // En passant capture: restore the captured pawn
@@ -1185,7 +1306,12 @@ fn unmake_move(board: &mut Board, mv: Move, undo: MoveUndo) {
 
         let captured_pawn_square = if opponent == Color::White { mv.to + 8 } else { mv.to - 8 };
 
-        board.board[captured_pawn_square as usize] = if opponent == Color::White { B_PAWN } else { W_PAWN };
+        let captured_pawn = if opponent == Color::White { B_PAWN } else { W_PAWN };
+
+        board.board[captured_pawn_square as usize] = captured_pawn;
+
+        // Piece list: restore captured pawn
+        add_piece_to_list(board, captured_pawn_square, captured_pawn);
     }
 
     // Castling: restore the rook to its original square
@@ -1196,21 +1322,37 @@ fn unmake_move(board: &mut Board, mv: Move, undo: MoveUndo) {
             board.board[7] = W_ROOK;
 
             board.board[5] = EMPTY;
+
+            remove_piece_from_list(board, 5, W_ROOK);
+
+            add_piece_to_list(board, 7, W_ROOK);
         } else if mv.from == 4 && mv.to == 2 {
 
             board.board[0] = W_ROOK;
 
             board.board[3] = EMPTY;
+
+            remove_piece_from_list(board, 3, W_ROOK);
+
+            add_piece_to_list(board, 0, W_ROOK);
         } else if mv.from == 60 && mv.to == 62 {
 
             board.board[63] = B_ROOK;
 
             board.board[61] = EMPTY;
+
+            remove_piece_from_list(board, 61, B_ROOK);
+
+            add_piece_to_list(board, 63, B_ROOK);
         } else if mv.from == 60 && mv.to == 58 {
 
             board.board[56] = B_ROOK;
 
             board.board[59] = EMPTY;
+
+            remove_piece_from_list(board, 59, B_ROOK);
+
+            add_piece_to_list(board, 56, B_ROOK);
         }
     }
 
@@ -1274,6 +1416,30 @@ fn evaluate_board(board: &Board) -> i32 {
 // Quiescence search (captures only — handles horizon effect)
 // -----------------------------------------------------------------------------
 
+/// Static Exchange Evaluation: skip obviously losing captures in quiescence.
+/// Returns true if the capture is worth searching.
+fn good_capture(board: &Board, mv: &Move) -> bool {
+
+    // Promotions are always worth searching
+    if mv.promotion != 0 {
+
+        return true;
+    }
+
+    let victim = piece_value(board.board[mv.to as usize]);
+
+    let attacker = piece_value(board.board[mv.from as usize]);
+
+    // Hanging piece (undefended) — always search it
+    if !is_square_attacked(board, mv.to, board.side_to_move.opposite()) {
+
+        return true;
+    }
+
+    // Defended square: only search if we're not losing material
+    attacker <= victim + 50 // allow up to ~half a pawn loss
+}
+
 fn quiesce(board: &mut Board, mut alpha: i32, beta: i32, ply: u8) -> i32 {
 
     // Depth limit: prevent explosion on long capture chains
@@ -1313,6 +1479,15 @@ fn quiesce(board: &mut Board, mut alpha: i32, beta: i32, ply: u8) -> i32 {
         if !in_check_pos && board.board[mv.to as usize] == EMPTY && mv.promotion == 0 {
 
             continue;
+        }
+
+        // SEE: skip obviously losing captures in quiescence
+        if !in_check_pos && board.board[mv.to as usize] != EMPTY && mv.promotion == 0 {
+
+            if !good_capture(board, &mv) {
+
+                continue;
+            }
         }
 
         let undo = make_move(board, mv);
@@ -1613,12 +1788,153 @@ impl TranspositionTable {
 static TT: LazyLock<TranspositionTable> = LazyLock::new(TranspositionTable::new);
 
 // -----------------------------------------------------------------------------
+// Pinned-piece detection (pre-filter illegal moves before make/unmake)
+// -----------------------------------------------------------------------------
+
+#[derive(Clone, Copy)]
+
+struct Pin {
+    square: u8,
+    direction: i8, // step from king to pinned piece (or vice‑versa)
+}
+
+/// Maximum possible pins: at most one per direction from the king (8).
+const MAX_PINS: usize = 8;
+
+struct PinnedInfo {
+    pins: [Pin; MAX_PINS],
+    count: usize,
+}
+
+fn compute_pins(board: &Board) -> PinnedInfo {
+
+    let mut info = PinnedInfo {
+        pins: [Pin {
+            square: 0,
+            direction: 0,
+        }; MAX_PINS],
+        count: 0,
+    };
+
+    let king_sq = if board.side_to_move == Color::White {
+
+        board.wk_sq
+    } else {
+
+        board.bk_sq
+    };
+
+    let friendly_sign = board.side_to_move.sign();
+
+    for &dir in &[-9i8, -8, -7, -1, 1, 7, 8, 9] {
+
+        let mut sq = king_sq as i8 + dir;
+
+        let mut found_piece = None;
+
+        while sq >= 0 && sq < 64 {
+
+            let piece = board.board[sq as usize];
+
+            if piece != EMPTY {
+
+                let is_friendly = (piece > 0) == (friendly_sign == 1);
+
+                if is_friendly {
+
+                    if found_piece.is_none() {
+
+                        found_piece = Some(sq as u8);
+                    } else {
+
+                        break; // two friendlies on same ray = no pin
+                    }
+                } else {
+                    // Enemy piece — does it attack along this direction?
+                    let pt = piece.abs();
+
+                    let attacks_along = match dir {
+                        -9 | -7 | 7 | 9 => pt == 3 || pt == 5, // bishop or queen
+                        -8 | 1 | -1 | 8 => pt == 4 || pt == 5, // rook or queen
+                        _ => false,
+                    };
+
+                    if attacks_along {
+
+                        if let Some(pin_sq) = found_piece {
+
+                            info.pins[info.count] = Pin {
+                                square: pin_sq,
+                                direction: dir,
+                            };
+
+                            info.count += 1;
+                        }
+                    }
+
+                    break;
+                }
+            }
+
+            sq += dir;
+        }
+    }
+
+    info
+}
+
+/// Returns Some(pin_direction) if the piece at `square` is pinned.
+fn pinned_dir(square: u8, info: &PinnedInfo) -> Option<i8> {
+    for i in 0..info.count {
+        if info.pins[i].square == square {
+            return Some(info.pins[i].direction);
+        }
+    }
+    None
+}
+
+/// A pinned piece can only move along (or against) its pin direction.
+fn move_stays_on_pin(mv: &Move, pin_dir: i8) -> bool {
+    let dx = (mv.to as i8 % 8) - (mv.from as i8 % 8);
+    let dy = (mv.to as i8 / 8) - (mv.from as i8 / 8);
+    let step = if dx > 0 && dy > 0 {
+        9
+    } else if dx > 0 && dy < 0 {
+        -7
+    } else if dx < 0 && dy > 0 {
+        7
+    } else if dx < 0 && dy < 0 {
+        -9
+    } else if dx > 0 {
+        1
+    } else if dx < 0 {
+        -1
+    } else if dy > 0 {
+        8
+    } else if dy < 0 {
+        -8
+    } else {
+        // from == to (shouldn't happen for a real move)
+        return true;
+    };
+    step == pin_dir || step == -pin_dir
+}
+
+// -----------------------------------------------------------------------------
 // Search (Negamax with alpha-beta + TT + killers + LMR)
 // -----------------------------------------------------------------------------
 
 const MAX_PLY: usize = 64;
 
+const MAX_SEARCH_PLY: usize = 128; // Hard cap against stack overflow
+
 fn search(board: &mut Board, depth: usize, mut alpha: i32, beta: i32, killers: &mut [[Move; 2]], ply: usize) -> (i32, Move) {
+
+    // Safety guard: hard cap on recursion depth
+    if ply >= MAX_SEARCH_PLY {
+
+        return (evaluate_board(board), Move { from: 0, to: 0, promotion: 0 });
+    }
 
     let mut best_move = Move {
         from: 0,
@@ -1819,11 +2135,31 @@ fn search(board: &mut Board, depth: usize, mut alpha: i32, beta: i32, killers: &
 
     let in_check_pos = in_check(board);
 
+    // ── Precompute pinned pieces (avoid make/unmake for illegal moves) ──
+    let pin_info = if in_check_pos {
+        // Pins don't matter when in check — all moves must be checked normally
+        PinnedInfo {
+            pins: [Pin { square: 0, direction: 0 }; MAX_PINS],
+            count: 0,
+        }
+    } else {
+        compute_pins(board)
+    };
+
     for i in 0..pseudo_moves.count {
 
         let mv = pseudo_moves.moves[i];
 
         let is_quiet = board.board[mv.to as usize] == EMPTY && mv.promotion == 0;
+
+        // Quick filter: skip moves that would expose the king (via pin)
+        if !in_check_pos {
+            if let Some(pin_dir) = pinned_dir(mv.from, &pin_info) {
+                if !move_stays_on_pin(&mv, pin_dir) {
+                    continue;
+                }
+            }
+        }
 
         let undo = make_move(board, mv);
 

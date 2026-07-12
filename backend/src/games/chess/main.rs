@@ -1514,7 +1514,7 @@ fn decode_promotion(code: u8, side: Color) -> i8 {
 // Transposition table (lock‑free, 8 MB ≈ 2^19 entries, depth‑preferred eviction)
 // -----------------------------------------------------------------------------
 
-const TT_BITS: usize = 19; // 2^19 = 524 288 entries × 16 bytes ≈ 8 MB
+const TT_BITS: usize = 21; // 2^21 = 2 097 152 entries × 16 bytes ≈ 32 MB
 
 const TT_MASK: usize = (1 << TT_BITS) - 1;
 
@@ -1910,12 +1910,11 @@ pub fn best_move(fen: &str, depth: usize) -> Option<String> {
         Err(_) => return None,
     };
 
-    crate::log_info(format!(
-        "[chess] TT={} entries, depth={}, fen={}",
-        1 << TT_BITS,
+    crate::log_info(crate::LogMsg::ChessSearch {
+        tt_entries: 1 << TT_BITS,
         depth,
-        fen,
-    ));
+        fen: fen.to_owned(),
+    });
 
     // Iterative deepening: search depth 1→N so each level warms the TT
     // for the next. This gives near‑optimal move ordering at the target depth.
@@ -1938,10 +1937,12 @@ pub fn best_move(fen: &str, depth: usize) -> Option<String> {
 
         let is_valid = mv.from != mv.to || mv.promotion != 0;
 
-        crate::log_debug(format!(
-            "[chess]  depth={d} score={score} best={} valid={is_valid}",
-            if is_valid { square_name(mv.from) + &square_name(mv.to) } else { "none".into() },
-        ));
+        crate::log_debug(crate::LogMsg::ChessDepth {
+            depth: d,
+            score,
+            best: if is_valid { square_name(mv.from) + &square_name(mv.to) } else { "none".into() },
+            is_valid,
+        });
 
         if is_valid {
 
@@ -1952,14 +1953,14 @@ pub fn best_move(fen: &str, depth: usize) -> Option<String> {
     // No legal moves (checkmate or stalemate)
     if best_move.from == best_move.to {
 
-        crate::log_warn("[chess]  => None (no valid move found across all depths)".into());
+        crate::log_warn(crate::LogMsg::ChessNoMove);
 
         return None;
     }
 
     let result = format!("{}{}", square_name(best_move.from), square_name(best_move.to));
 
-    crate::log_info(format!("[chess]  => {result}"));
+    crate::log_info(crate::LogMsg::ChessResult { best_move: result.clone() });
 
     Some(result)
 }

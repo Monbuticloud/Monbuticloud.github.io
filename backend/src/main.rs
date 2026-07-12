@@ -40,26 +40,53 @@ impl std::fmt::Display for LogLevel {
     }
 }
 
-pub(crate) static LOG_BUFFER: LazyLock<SegQueue<(String, LogLevel, DateTime<Utc>)>> = LazyLock::new(SegQueue::new);
+/// Structured log messages — no freeform strings.
+#[derive(Debug)]
+pub(crate) enum LogMsg {
+    Request { path: String },
+    ChessSearch { tt_entries: usize, depth: usize, fen: String },
+    ChessDepth { depth: usize, score: i32, best: String, is_valid: bool },
+    ChessNoMove,
+    ChessResult { best_move: String },
+}
+
+impl std::fmt::Display for LogMsg {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            LogMsg::Request { path } => write!(f, "[req] {path}"),
+            LogMsg::ChessSearch { tt_entries, depth, fen } => {
+                write!(f, "[chess] TT={tt_entries} entries, depth={depth}, fen={fen}")
+            }
+            LogMsg::ChessDepth { depth, score, best, is_valid } => {
+                write!(f, "[chess]  depth={depth} score={score} best={best} valid={is_valid}")
+            }
+            LogMsg::ChessNoMove => write!(f, "[chess]  => None (no valid move found across all depths)"),
+            LogMsg::ChessResult { best_move } => write!(f, "[chess]  => {best_move}"),
+        }
+    }
+}
+
+pub(crate) static LOG_BUFFER: LazyLock<SegQueue<(LogMsg, LogLevel, DateTime<Utc>)>> =
+    LazyLock::new(SegQueue::new);
 
 /// Approximate number of items in `LOG_BUFFER` (used to trigger early flush).
 pub(crate) static LOG_DEPTH: AtomicUsize = AtomicUsize::new(0);
 
-pub(crate) fn log_msg(level: LogLevel, msg: String) {
+pub(crate) fn log_msg(level: LogLevel, msg: LogMsg) {
     LOG_BUFFER.push((msg, level, Utc::now()));
     LOG_DEPTH.fetch_add(1, Ordering::Release);
 }
 
-pub(crate) fn log_info(msg: String) {
+pub(crate) fn log_info(msg: LogMsg) {
     log_msg(LogLevel::Info, msg);
 }
-pub(crate) fn log_warn(msg: String) {
+pub(crate) fn log_warn(msg: LogMsg) {
     log_msg(LogLevel::Warn, msg);
 }
-pub(crate) fn log_debug(msg: String) {
+pub(crate) fn log_debug(msg: LogMsg) {
     log_msg(LogLevel::Debug, msg);
 }
-pub(crate) fn log_error(msg: String) {
+pub(crate) fn log_error(msg: LogMsg) {
     log_msg(LogLevel::Error, msg);
 }
 
@@ -73,10 +100,10 @@ fn main() {
     std::panic::set_hook(Box::new(move |info| {
         let mut buf = String::new();
 
-        while let Some((msg, level, time)) = LOG_BUFFER.pop() {
+        while let Some((log_msg, level, time)) = LOG_BUFFER.pop() {
             use std::fmt::Write;
 
-            let _ = writeln!(buf, "[{}] [{:>5}] {}", time.format("%H:%M:%S"), level.to_string(), msg);
+            let _ = writeln!(buf, "[{}] [{:>5}] {}", time.format("%H:%M:%S"), level.to_string(), log_msg);
         }
 
         if !buf.is_empty() {
@@ -98,10 +125,10 @@ fn main() {
             loop {
                 let mut buf = String::new();
 
-                while let Some((path, level, time)) = LOG_BUFFER.pop() {
+                while let Some((log_msg, level, time)) = LOG_BUFFER.pop() {
                     use std::fmt::Write;
 
-                    let _ = writeln!(buf, "[{}] [{:>5}] {}", time.format("%H:%M:%S"), level.to_string(), path);
+                    let _ = writeln!(buf, "[{}] [{:>5}] {}", time.format("%H:%M:%S"), level.to_string(), log_msg);
 
                     LOG_DEPTH.fetch_sub(1, Ordering::Release);
                 }
@@ -222,7 +249,7 @@ async fn track_request(request: axum::http::Request<Body>, next: Next) -> Respon
 
     let time = Utc::now();
 
-    LOG_BUFFER.push((path, LogLevel::Info, time));
+    LOG_BUFFER.push((LogMsg::Request { path }, LogLevel::Info, time));
 
     next.run(request).await
 }
@@ -239,7 +266,7 @@ fn json_body(status: StatusCode, body: String) -> Response<Body> {
 
 /// GET /api/games/chess/completions?fen=...&depth=5
 ///
-/// `depth`: 1–7, clamped at 7.  8+ reserved for future account tier.
+/// `depth`: 1–12 for anonymous, 13–15 gated behind auth (when implemented).
 /// Default 5. Runs on a blocking thread so the async runtime isn't starved.
 
 async fn get_chess_completion(params: Query<HashMap<String, String>>) -> Response<Body> {
@@ -251,11 +278,10 @@ async fn get_chess_completion(params: Query<HashMap<String, String>>) -> Respons
     let depth = params
         .get("depth")
         .and_then(|v| v.parse::<usize>().ok())
-        .map(|d| d.clamp(1, 20))
+        .map(|d| d.clamp(1, 12))
         .unwrap_or(5);
 
-    // TODO: raise to 9 + gate depth≥8 behind account/auth
-    // TDOO^2:
+    // TODO: gate depth 13–15 behind auth token
 
     let fen = fen.clone();
 

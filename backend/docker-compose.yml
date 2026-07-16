@@ -1,4 +1,23 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: homepage
+      POSTGRES_PASSWORD: homepage
+      POSTGRES_DB: homepage
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+      - ./config/postgres/postgresql.conf:/etc/postgresql/postgresql.conf:ro
+      - ./config/postgres/setup.sql:/docker-entrypoint-initdb.d/00-setup.sql:ro
+    command: postgres -c config_file=/etc/postgresql/postgresql.conf
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U homepage -d homepage"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
   nginx:
     build:
       context: .
@@ -10,9 +29,29 @@ services:
       app:
         condition: service_started
 
+  pgdog:
+    image: ghcr.io/pgdogdev/pgdog:main
+    ports:
+      - "6432:6432"
+      - "8081:8080"
+      - "9631:9630"
+    volumes:
+      - ./config/pgdog/pgdog.toml:/etc/pgdog/pgdog.toml:ro
+      - ./config/pgdog/users.toml:/etc/pgdog/users.toml:ro
+    command: ["--config", "/etc/pgdog/pgdog.toml", "--users", "/etc/pgdog/users.toml"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   app:
     build:
       context: .
       dockerfile: Dockerfile
     expose:
       - "8000"
+    environment:
+      DATABASE_URL: "postgres://homepage:homepage@pgdog:6432/homepage"
+      AUTH_HMAC_SECRET: "${AUTH_HMAC_SECRET}"
+    depends_on:
+      pgdog:
+        condition: service_started

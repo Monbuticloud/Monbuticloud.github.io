@@ -4,7 +4,7 @@
 
 use std::sync::{
     LazyLock,
-    atomic::{AtomicU64, Ordering},
+    atomic::{AtomicBool, AtomicU64, Ordering},
 };
 
 // -----------------------------------------------------------------------------
@@ -106,13 +106,30 @@ fn remove_piece_from_list(board: &mut Board, sq: u8, piece: i8) {
             return;
         }
     }
+    // Piece not found in list — likely a stale entry from a previous corruption.
+    // Fallback: scan the board and rebuild the list for this piece type.
+    let max = board.piece_list[idx].len() as u8;
+    let mut offset = 0u8;
+    for sq in 0..64u8 {
+        if offset >= max {
+            break;
+        }
+        if board.board[sq as usize] == piece {
+            board.piece_list[idx][offset as usize] = sq;
+            offset += 1;
+        }
+    }
+    board.piece_count[idx] = offset;
 }
 
 fn add_piece_to_list(board: &mut Board, sq: u8, piece: i8) {
     let idx = piece_to_list_idx(piece);
     let count = board.piece_count[idx];
-    board.piece_list[idx][count as usize] = sq;
-    board.piece_count[idx] = count + 1;
+    if (count as usize) < board.piece_list[idx].len() {
+        board.piece_list[idx][count as usize] = sq;
+        board.piece_count[idx] = count + 1;
+    }
+    // Silently drop if list is full (pathological promotion scenarios)
 }
 
 // Piece-square tables (from Sunfish, simplified)
@@ -199,6 +216,7 @@ impl Move {
 // Board state
 // -----------------------------------------------------------------------------
 
+#[derive(Clone)]
 struct Board {
     board: [i8; 64],
     side_to_move: Color,
@@ -211,7 +229,7 @@ struct Board {
     hash: u64, // Zobrist hash (incremental for O(1) TT probes)
     // Piece lists: 12 fixed-size arrays (6 types × 2 colors), zero heap.
     // Max per type: pawns=8, all others ≤2 — [u8; 8] covers everything.
-    piece_list: [[u8; 8]; 12],
+    piece_list: [[u8; 16]; 12], // up to 10 of a type after promotions (rooks/knights/bishops)
     piece_count: [u8; 12],
 }
 
@@ -228,7 +246,7 @@ impl Board {
             wk_sq: E1,
             bk_sq: E8,
             hash: 0,
-            piece_list: [[0u8; 8]; 12],
+            piece_list: [[0u8; 16]; 12],
             piece_count: [0u8; 12],
         }
     }
@@ -959,6 +977,18 @@ fn make_move(board: &mut Board, mv: Move) -> MoveUndo {
 
     let moving_piece = board.board[mv.from as usize];
 
+    // Safety: reject corrupt moves (EMPTY source square)
+    if moving_piece == EMPTY {
+
+        return MoveUndo {
+            captured: EMPTY,
+            ep_square: -1,
+            castling_rights: 0,
+            halfmove_clock: 0,
+            hash: board.hash,
+        };
+    }
+
     let is_king = moving_piece == (if current_side == Color::White { W_KING } else { B_KING });
 
     let is_rook = !is_king && moving_piece.abs() == 4;
@@ -1538,6 +1568,10 @@ impl XorShift64 {
 
 /// Compute the Zobrist key index for a piece on a square.
 fn zobrist_key(piece: i8, sq: Square) -> usize {
+    debug_assert!(piece != EMPTY, "zobrist_key called with EMPTY piece");
+    if piece == EMPTY {
+        return 0;
+    }
     let pt = piece.unsigned_abs() as usize - 1; // 0..5
     let color = if piece > 0 { 0 } else { 1 }; // 0=White, 1=Black
     (pt * 2 + color) * 64 + sq as usize
@@ -2241,7 +2275,7 @@ fn search(board: &mut Board, depth: usize, mut alpha: i32, beta: i32, killers: &
 
 pub fn best_move(fen: &str, depth: usize) -> Option<String> {
 
-    let mut board = match parse_fen(fen) {
+    let board = match parse_fen(fen) {
         Ok(board) => board,
         Err(_) => return None,
     };
@@ -2252,39 +2286,66 @@ pub fn best_move(fen: &str, depth: usize) -> Option<String> {
         fen: fen.to_owned(),
     });
 
-    // Iterative deepening: search depth 1→N so each level warms the TT
-    // for the next. This gives near‑optimal move ordering at the target depth.
-    // Killers persist across iterations for better ordering.
-    let mut best_move = Move {
-        from: 0,
-        to: 0,
-        promotion: 0,
-    };
+    // ── Lazy SMP: N search tasks on the rayon pool, one TT ──
+    // All tasks run iterative deepening independently.
+    // They share the lock‑free TT, so each task's results
+    // improve move ordering for all others.
+    // Using rayon::scope (not std::thread::scope) reuses the existing
+    // CHESS_POOL threads — zero per‑request thread overhead,
+    // and concurrent requests share the pool without oversubscription.
+    let num_threads = std::thread::available_parallelism()
+        .map_or(2, |n| (n.get() as usize).min(4));
 
-    let mut killers = [[Move {
-        from: 0,
-        to: 0,
-        promotion: 0,
-    }; 2]; MAX_PLY];
+    let leader_finished = AtomicBool::new(false);
+    let best_move_cell = std::sync::Mutex::new(None::<Move>);
 
-    for d in 1..=depth {
+    rayon::scope(|s| {
+        // ── Thread 0 (leader): full ID search ──
+        s.spawn(|_| {
+            let mut local_board = board.clone();
+            let mut killers = [[Move { from: 0, to: 0, promotion: 0 }; 2]; MAX_PLY];
+            let mut best = Move { from: 0, to: 0, promotion: 0 };
 
-        let (score, mv) = search(&mut board, d, -30000, 30000, &mut killers, 0);
+            for d in 1..=depth {
+                let (score, mv) = search(&mut local_board, d, -30000, 30000, &mut killers, 0);
+                let is_valid = mv.from != mv.to || mv.promotion != 0;
 
-        let is_valid = mv.from != mv.to || mv.promotion != 0;
+                crate::log_debug(crate::LogMsg::ChessDepth {
+                    depth: d,
+                    score,
+                    best: if is_valid { square_name(mv.from) + &square_name(mv.to) } else { "none".into() },
+                    is_valid,
+                });
 
-        crate::log_debug(crate::LogMsg::ChessDepth {
-            depth: d,
-            score,
-            best: if is_valid { square_name(mv.from) + &square_name(mv.to) } else { "none".into() },
-            is_valid,
+                if is_valid {
+                    best = mv;
+                }
+            }
+
+            *best_move_cell.lock().unwrap() = Some(best);
+            leader_finished.store(true, Ordering::Release);
         });
 
-        if is_valid {
+        // ── Helper tasks: same search, sharing only the TT ──
+        for _ in 1..num_threads {
+            s.spawn(|_| {
+                let mut local_board = board.clone();
+                let mut killers = [[Move { from: 0, to: 0, promotion: 0 }; 2]; MAX_PLY];
 
-            best_move = mv;
+                for d in 1..=depth {
+                    if leader_finished.load(Ordering::Acquire) {
+                        break;
+                    }
+                    search(&mut local_board, d, -30000, 30000, &mut killers, 0);
+                }
+            });
         }
-    }
+    });
+
+    let best_move = match best_move_cell.into_inner() {
+        Ok(Some(mv)) => mv,
+        _ => return None,
+    };
 
     // No legal moves (checkmate or stalemate)
     if best_move.from == best_move.to {

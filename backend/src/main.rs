@@ -1,4 +1,7 @@
+mod auth;
+mod db;
 mod games;
+mod schema;
 
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
@@ -6,12 +9,24 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 /// Dedicated thread pool for chess search (tiny stacks, no tokio blocking pool).
 /// The engine uses ~70KB stack at peak; 256KB gives 8× margin.
 static CHESS_POOL: std::sync::LazyLock<rayon::ThreadPool> = std::sync::LazyLock::new(|| {
+    let cpus = std::thread::available_parallelism().map_or(4, |n| n.get());
     rayon::ThreadPoolBuilder::new()
-        .num_threads(std::thread::available_parallelism().map_or(4, |n| n.get()).max(128))
+        .num_threads(cpus.max(32).min(128))
         .thread_name(|i| format!("chess-{i}"))
         .stack_size(256 * 1024)
         .build()
         .expect("failed to build chess thread pool")
+});
+
+/// Max concurrent chess searches. Beyond this the handler returns 503 immediately.
+/// Each search uses 1 leader + 3 helpers = 4 pool threads.
+/// Permit count = pool_size / 4 so we never oversubscribe the pool.
+/// On a 4‑core machine: pool=32 → 8 permits.
+/// On a 128‑core machine: pool=128 → 32 permits.
+static CHESS_SEMAPHORE: std::sync::LazyLock<Semaphore> = std::sync::LazyLock::new(|| {
+    let cpus = std::thread::available_parallelism().map_or(4, |n| n.get());
+    let pool_size = cpus.max(32).min(128);
+    Semaphore::new(pool_size / 4)
 });
 
 use axum::{
@@ -20,7 +35,7 @@ use axum::{
     extract::Query,
     http::{Response, StatusCode, header},
     middleware::{self, Next},
-    routing::get,
+    routing::{get, post},
 };
 use chrono::{DateTime, Utc};
 use crossbeam::queue::SegQueue;
@@ -36,6 +51,7 @@ use std::{
     time::Duration,
 };
 use tokio::runtime::Builder;
+use tokio::sync::Semaphore;
 use tower_http::services::ServeDir;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -69,6 +85,10 @@ pub(crate) enum LogMsg {
         depth: usize,
         fen: String,
     },
+    DbPing {
+        ok: bool,
+        detail: String,
+    },
     ChessDepth {
         depth: usize,
         score: i32,
@@ -79,6 +99,12 @@ pub(crate) enum LogMsg {
     ChessResult {
         best_move: String,
     },
+    ResourceUsage {
+        rss_kb: u64,
+        vm_kb: u64,
+        threads: u16,
+        cpu_secs: f64,
+    },
 }
 
 impl std::fmt::Display for LogMsg {
@@ -87,6 +113,9 @@ impl std::fmt::Display for LogMsg {
             LogMsg::Request { path } => write!(f, "[req] {path}"),
             LogMsg::ChessSearch { tt_entries, depth, fen } => {
                 write!(f, "[chess] TT={tt_entries} entries, depth={depth}, fen={fen}")
+            },
+            LogMsg::DbPing { ok, detail } => {
+                write!(f, "[db] ping={} detail={detail}", if *ok { "ok" } else { "FAIL" })
             },
             LogMsg::ChessDepth {
                 depth,
@@ -98,6 +127,9 @@ impl std::fmt::Display for LogMsg {
             },
             LogMsg::ChessNoMove => write!(f, "[chess]  => None (no valid move found across all depths)"),
             LogMsg::ChessResult { best_move } => write!(f, "[chess]  => {best_move}"),
+            LogMsg::ResourceUsage { rss_kb, vm_kb, threads, cpu_secs } => {
+                write!(f, "[res] RSS={rss_kb}kB VM={vm_kb}kB threads={threads} CPU={cpu_secs:.1}s")
+            },
         }
     }
 }
@@ -130,6 +162,45 @@ pub(crate) fn log_error(msg: LogMsg) {
 static FILE_CACHE: LazyLock<RwLock<HashMap<&'static str, (StatusCode, String, &'static mime::Mime)>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
 
+// ── Resource monitor (reads /proc/self/status and /proc/self/stat) ──
+
+fn sample_resources() -> Option<LogMsg> {
+    let status = std::fs::read_to_string("/proc/self/status").ok()?;
+    let mut rss_kb = 0u64;
+    let mut vm_kb = 0u64;
+    let mut threads = 0u16;
+
+    for line in status.lines() {
+        if let Some(rest) = line.strip_prefix("VmRSS:") {
+            rss_kb = rest.trim().trim_end_matches("kB").trim().parse().ok()?;
+        } else if let Some(rest) = line.strip_prefix("VmSize:") {
+            vm_kb = rest.trim().trim_end_matches("kB").trim().parse().ok()?;
+        } else if let Some(rest) = line.strip_prefix("Threads:") {
+            threads = rest.trim().parse().ok()?;
+        }
+    }
+
+    // /proc/self/stat: fields 14 (utime) and 15 (stime) at indices 13, 14
+    // Comm is in parens — find the last `)` after the first `(` for safety.
+    let stat = std::fs::read_to_string("/proc/self/stat").ok()?;
+    let paren_close = stat.rfind(')')?;
+    let rest = &stat[paren_close + 1..];
+    let fields: Vec<&str> = rest.split_whitespace().collect();
+    if fields.len() < 15 {
+        return None;
+    }
+    let utime: u64 = fields[13].parse().ok()?;
+    let stime: u64 = fields[14].parse().ok()?;
+    let cpu_secs = (utime + stime) as f64 / 100.0; // CLK_TCK = 100 on Linux
+
+    Some(LogMsg::ResourceUsage {
+        rss_kb,
+        vm_kb,
+        threads,
+        cpu_secs,
+    })
+}
+
 fn main() {
     // ── Panic hook: flush buffered logs before the process goes down ──
     let prev = std::panic::take_hook();
@@ -161,6 +232,7 @@ fn main() {
 
             loop {
                 let mut buf = String::new();
+                let mut flushed: usize = 0;
 
                 while let Some((log_msg, level, time)) = LOG_BUFFER.pop() {
                     use std::fmt::Write;
@@ -168,10 +240,12 @@ fn main() {
                     let _ = writeln!(buf, "[{}] [{:>5}] {}", time.format("%H:%M:%S"), level.to_string(), log_msg);
 
                     LOG_DEPTH.fetch_sub(1, Ordering::Release);
+                    flushed += 1;
                 }
 
                 if !buf.is_empty() {
-                    print!("{buf}");
+                    let now = Utc::now().format("%Y-%m-%d %H:%M:%S%.3f");
+                    print!("{buf}[FLUSHED {flushed} LOGS FROM BUFFER AT {now}]\n\r");
 
                     stdout().flush().ok();
                 }
@@ -187,6 +261,14 @@ fn main() {
         }
     });
 
+    // ── Resource monitor: sample RSS / VM / threads / CPU every 10s ──
+    std::thread::spawn(|| loop {
+        std::thread::sleep(Duration::from_secs(10));
+        if let Some(msg) = sample_resources() {
+            log_debug(msg);
+        }
+    });
+
     let rt = Builder::new_multi_thread()
         .enable_all()
         .max_blocking_threads(8192)
@@ -199,6 +281,7 @@ fn main() {
         let addr: SocketAddr = format!("0.0.0.0:{port}").parse().expect("Invalid socket address");
 
         let app = Router::new()
+            .route("/health", get(|| async { "ok" }))
             //- index
             .route("/", get(|| serve_static("static/index.html")))
             .route("/index", get(|| serve_static("static/index.html")))
@@ -223,9 +306,18 @@ fn main() {
             .route("/common.css", get(|| serve_static("static/common.css")))
             //- chess API
             .route("/api/games/chess/completions", get(get_chess_completion))
+            //- auth tool page
+            .route("/auth-tool.html", get(|| serve_static("static/auth.html")))
+            .route("/auth-tool", get(|| serve_static("static/auth.html")))
+            //- auth API
+            .route("/api/auth/keys", post(auth::handlers::register_key))
+            .route("/api/auth/challenge", get(auth::handlers::challenge))
+            .route("/api/auth/authorize", post(auth::handlers::authorize))
+            .route("/api/auth/logout-all", post(auth::handlers::logout_all))
             //-404
             .layer(middleware::from_fn(track_request));
 
+        db::init().await;
         println!("listening on {addr}");
 
         stdout().flush().ok();
@@ -311,17 +403,33 @@ async fn get_chess_completion(params: Query<HashMap<String, String>>) -> Respons
         None => return json_body(StatusCode::BAD_REQUEST, r#"{"error":"missing 'fen' query parameter"}"#.into()),
     };
 
-    let depth = params
-        .get("depth")
-        .and_then(|v| v.parse::<usize>().ok())
-        .map(|d| d.clamp(1, 12))
-        .unwrap_or(5);
+    let depth = match params.get("depth") {
+        Some(v) => match v.parse::<usize>() {
+            Ok(d) if (1..=12).contains(&d) => d,
+            _ => return json_body(StatusCode::BAD_REQUEST, r#"{"error":"'depth' must be 1–12"}"#.into()),
+        },
+        None => 5,
+    };
 
     // TODO: gate depth 13–15 behind auth token
 
+    // ── Backpressure: reject immediately if all search slots are busy ──
+    let permit = match CHESS_SEMAPHORE.try_acquire() {
+        Ok(p) => p,
+        Err(_) => {
+            return json_body(
+                StatusCode::SERVICE_UNAVAILABLE,
+                r#"{"error":"too many concurrent searches, try again later"}"#.into(),
+            );
+        },
+    };
+
     let fen = fen.clone();
 
-    let search = tokio::task::spawn_blocking(move || CHESS_POOL.install(|| games::chess::best_move(&fen, depth)));
+    let search = tokio::task::spawn_blocking(move || {
+        let _permit = permit; // held until search completes
+        CHESS_POOL.install(|| games::chess::best_move(&fen, depth))
+    });
 
     let result = tokio::time::timeout(std::time::Duration::from_secs(60), search).await;
 

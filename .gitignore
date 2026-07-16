@@ -1,7 +1,17 @@
 .DS_Store
 
 # Rust / Cargo
-backend/target/
+target/
 
 # Nginx
 backend/nginx/certs/
+
+# Docker data volumes (bind mounts)
+backend/data/
+
+# Environment / Secrets
+backend/.env
+
+# Temp files
+backend/.tmp/
+backend/v

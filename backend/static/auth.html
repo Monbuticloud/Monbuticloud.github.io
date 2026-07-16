@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="en" data-theme-mode="Dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Homepage Auth</title>
+<style>
+:root {
+  --lime-cream-500: #b2d430;
+  --lime-cream-700: #8aad20;
+  --lime-cream-900: #5a7a10;
+  --wine-plum-500: #2d1b2e;
+  --wine-plum-700: #1f0f20;
+  --wine-plum-900: #0f0510;
+  --rosy-taupe-100: #d4c5c9;
+  --rosy-taupe-500: #8a7a7e;
+  --rosy-taupe-600: #6a5a5e;
+  --rosy-taupe-700: #4a3a3e;
+  --berry-blush-500: #d4508a;
+  --amber-500: #ffb020;
+  --frosted-mint-600: #30c8a0;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: ui-monospace, "SF Mono", "Fira Code", "Courier New", monospace;
+  background: #0d0d1a;
+  color: #d4c5c9;
+  font-size: 14px;
+  line-height: 1.6;
+  padding: 2em 1.5em;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+h1 {
+  font-size: 1.5em;
+  color: var(--lime-cream-500);
+  margin-bottom: 1.5em;
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+}
+
+h1 small { font-size: 0.5em; color: var(--rosy-taupe-500); font-weight: normal; }
+
+.card {
+  background: #151525;
+  border: 1px solid #2a2a3e;
+  border-radius: 6px;
+  padding: 1.25em;
+  margin-bottom: 1em;
+}
+
+.card h2 {
+  font-size: 0.85em;
+  color: var(--lime-cream-500);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  margin-bottom: 0.75em;
+}
+
+.row {
+  display: flex;
+  gap: 0.5em;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 0.5em;
+}
+
+label {
+  font-size: 0.8em;
+  color: var(--rosy-taupe-600);
+  min-width: 8em;
+}
+
+input[type="text"],
+input[type="password"] {
+  flex: 1;
+  min-width: 200px;
+  background: #0d0d1a;
+  border: 1px solid #2a2a3e;
+  color: #d4c5c9;
+  font-family: inherit;
+  font-size: inherit;
+  padding: 0.4em 0.6em;
+  border-radius: 3px;
+  outline: none;
+}
+
+input:focus { border-color: var(--lime-cream-500); }
+
+textarea {
+  width: 100%;
+  background: #0d0d1a;
+  border: 1px solid #2a2a3e;
+  color: var(--lime-cream-500);
+  font-family: inherit;
+  font-size: 0.8em;
+  padding: 0.5em;
+  border-radius: 3px;
+  resize: vertical;
+  outline: none;
+  min-height: 4em;
+}
+
+textarea:focus { border-color: var(--lime-cream-500); }
+
+button {
+  background: var(--lime-cream-500);
+  color: var(--wine-plum-900);
+  border: none;
+  font-family: inherit;
+  font-size: 0.8em;
+  font-weight: 600;
+  padding: 0.5em 1em;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+button:hover { background: var(--lime-cream-700); }
+button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+button.secondary {
+  background: transparent;
+  border: 1px solid #2a2a3e;
+  color: var(--rosy-taupe-100);
+}
+
+button.secondary:hover { border-color: var(--lime-cream-500); color: var(--lime-cream-500); }
+
+button.danger {
+  background: #802020;
+}
+
+button.danger:hover { background: #a03030; }
+
+.output {
+  margin-top: 0.5em;
+  padding: 0.5em;
+  background: #0d0d1a;
+  border-radius: 3px;
+  font-size: 0.75em;
+  word-break: break-all;
+  color: var(--lime-cream-500);
+  border: 1px solid transparent;
+}
+
+.output.error { color: #d45050; border-color: #802020; }
+.output.success { border-color: var(--lime-cream-500); }
+.output.info { color: var(--rosy-taupe-100); }
+
+.status-dot {
+  display: inline-block;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  margin-right: 0.5em;
+}
+
+.status-dot.ok { background: var(--lime-cream-500); }
+.status-dot.fail { background: #d45050; }
+
+.hidden { display: none !important; }
+
+.mono { font-family: inherit; }
+
+#session-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3em;
+}
+
+.session-field {
+  display: flex;
+  gap: 1em;
+  font-size: 0.75em;
+}
+
+.session-field .key { color: var(--rosy-taupe-600); min-width: 10em; }
+.session-field .val { color: var(--lime-cream-500); word-break: break-all; }
+
+@media (max-width: 600px) {
+  body { padding: 1em; }
+  .row { flex-direction: column; align-items: stretch; }
+  input[type="text"] { min-width: 0; }
+  label { min-width: 0; }
+}
+</style>
+</head>
+<body>
+
+<div style="font-size:0.75em;color:var(--rosy-taupe-500);margin-bottom:1.5em;background:#151525;border:1px solid #2a2a3e;border-radius:3px;padding:0.6em 1em">
+  <strong style="color:var(--lime-cream-500)">⟐ Offline use:</strong>
+  Save this page for air-gapped signing:
+  <kbd style="background:#0d0d1a;padding:0.1em 0.4em;border-radius:2px">Ctrl+S</kbd>
+  →
+  <em>"Web Archive, Single File (.mhtml)"</em>
+  or download as
+  <a href="/auth-tool.mhtml" style="color:var(--lime-cream-500)">homepage-auth.mhtml</a>
+</div>
+
+<h1>
+  ∷ auth-tool
+  <small>FALCON challenge-response signing</small>
+</h1>
+
+<!-- ═══ Step 1: Key Manager ═══ -->
+<div class="card">
+  <h2>⦿ Key Manager</h2>
+
+  <div class="row">
+    <label>key_id</label>
+    <input type="text" id="key-id" value="laptop" placeholder="e.g. laptop, phone, server">
+    <button id="btn-generate">Generate Keypair</button>
+  </div>
+
+  <div class="output hidden" id="keygen-output"></div>
+
+  <div class="row" style="margin-top:0.75em">
+    <button class="secondary" id="btn-download-key" disabled>Download .priv</button>
+    <button class="secondary" id="btn-load-key">Load .priv</button>
+    <button class="secondary" id="btn-register" disabled>Register pub key</button>
+  </div>
+  <input type="file" id="file-input" accept=".priv" class="hidden">
+</div>
+
+<!-- ═══ Step 2: Authorize ═══ -->
+<div class="card">
+  <h2>⦿ Authorize Session</h2>
+
+  <div class="row">
+    <button id="btn-challenge" disabled>1. Get Challenge</button>
+    <button id="btn-sign" disabled>2. Sign &amp; Authorize</button>
+  </div>
+
+  <div class="output hidden" id="auth-output"></div>
+
+  <div id="session-info" class="hidden" style="margin-top:0.5em">
+    <div class="session-field"><span class="key">session_token</span><span class="val" id="sess-token"></span></div>
+    <div class="session-field"><span class="key">capabilities</span><span class="val" id="sess-cap"></span></div>
+    <div class="session-field"><span class="key">expires_at</span><span class="val" id="sess-exp"></span></div>
+    <div style="margin-top:0.5em">
+      <button class="danger" id="btn-logout-all">Logout All</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ Step 3: Use ═══ -->
+<div class="card">
+  <h2>⦿ Authenticated Request</h2>
+
+  <div class="row">
+    <label>Path</label>
+    <input type="text" id="api-path" value="/api/games/chess/completions?fen=rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1&depth=5">
+  </div>
+  <div class="row">
+    <button id="btn-call-api" disabled>Call API</button>
+  </div>
+  <div class="output hidden" id="api-output"></div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// Auth Tool — client-side FALCON key management + challenge-response
+//
+// Crypto is a stub (uses Web Crypto ECDSA for placeholder flow).
+// Replace with FALCON when available.
+//
+// IMPORTANT: MHTML opened from file:// cannot load external WASM.
+// The FALCON WASM must be converted to pure JS with wasm2js:
+//   wasm2js falcon.wasm -O -o falcon.js
+//   // then inline falcon.js contents here
+// or ship the wasm as an inline Uint8Array + instantiate.
+// ═══════════════════════════════════════════════════════════════════
+
+const API_BASE = '';
+
+// ── State ────────────────────────────────────────────────────────
+let keypair = null;        // { pubKey, privKey } — raw bytes (base64)
+let challenge = null;       // { nonce, hmac_token, expires_at }
+let sessionToken = null;    // current session token
+let sessionData = null;     // { capabilities, expires_at }
+
+// ── DOM refs ─────────────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+const keyId    = $('key-id');
+const btnGen   = $('btn-generate');
+const btnDl    = $('btn-download-key');
+const btnLoad  = $('btn-load-key');
+const btnReg   = $('btn-register');
+const fileIn   = $('file-input');
+const btnChal  = $('btn-challenge');
+const btnSign  = $('btn-sign');
+const btnLo    = $('btn-logout-all');
+const btnApi   = $('btn-call-api');
+
+const keygenOut = $('keygen-output');
+const authOut   = $('auth-output');
+const apiOut    = $('api-output');
+const sessInfo  = $('session-info');
+
+const sessTok   = $('sess-token');
+const sessCap   = $('sess-cap');
+const sessExp   = $('sess-exp');
+
+// ── Helpers ──────────────────────────────────────────────────────
+function show(el, msg, cls) {
+  el.classList.remove('hidden', 'error', 'success', 'info');
+  el.textContent = msg;
+  if (cls) el.classList.add(cls);
+}
+
+async function api(method, path, body) {
+  const opts = { method, headers: {} };
+  if (body) {
+    opts.headers['Content-Type'] = 'application/json';
+    opts.body = JSON.stringify(body);
+  }
+  if (sessionToken) {
+    opts.headers['Authorization'] = `Bearer ${sessionToken}`;
+  }
+  const res = await fetch(API_BASE + path, opts);
+  const data = await res.json();
+  return { ok: res.ok, status: res.status, data };
+}
+
+function btoaUrl(b) {
+  return btoa(String.fromCharCode(...new Uint8Array(b)))
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function atobUrl(s) {
+  s = s.replace(/-/g, '+').replace(/_/g, '/');
+  while (s.length % 4) s += '=';
+  const bin = atob(s);
+  return Uint8Array.from(bin, c => c.charCodeAt(0));
+}
+
+function base64Encode(b) {
+  return btoa(String.fromCharCode(...new Uint8Array(b)));
+}
+
+function base64Decode(s) {
+  const bin = atob(s);
+  return Uint8Array.from(bin, c => c.charCodeAt(0));
+}
+
+// ── Key generation (placeholder — replace with FALCON WASM) ──────
+async function generateKeypair() {
+  // TODO: Replace with FALCON.generateKeypair() via WASM
+  const key = await crypto.subtle.generateKey(
+    { name: 'ECDSA', namedCurve: 'P-384' },
+    true,
+    ['sign', 'verify']
+  );
+
+  const pubRaw = await crypto.subtle.exportKey('raw', key.publicKey);
+  const privRaw = await crypto.subtle.exportKey('pkcs8', key.privateKey);
+
+  return {
+    pubKey: new Uint8Array(pubRaw),
+    privKey: new Uint8Array(privRaw),
+    // Store the CryptoKey objects for actual signing
+    _signKey: key.privateKey,
+    _verifyKey: key.publicKey,
+  };
+}
+
+async function signNonce(nonceBytes) {
+  // TODO: Replace with FALCON.sign(privateKey, nonceBytes) via WASM
+  if (!keypair || !keypair._signKey) throw new Error('No key loaded for signing');
+
+  const sig = await crypto.subtle.sign(
+    { name: 'ECDSA', hash: 'SHA-384' },
+    keypair._signKey,
+    nonceBytes
+  );
+  return new Uint8Array(sig);
+}
+
+// ── Generate ─────────────────────────────────────────────────────
+btnGen.addEventListener('click', async () => {
+  const kid = keyId.value.trim();
+  if (!kid) { show(keygenOut, 'Enter a key_id first', 'error'); return; }
+
+  btnGen.disabled = true;
+  show(keygenOut, 'Generating keypair... (placeholder: ECDSA P-384, replace with FALCON WASM)', 'info');
+
+  try {
+    keypair = await generateKeypair();
+    show(keygenOut, `✅ Keypair generated\npub_key: ${base64Encode(keypair.pubKey).slice(0, 48)}...`, 'success');
+    btnDl.disabled = false;
+    btnReg.disabled = false;
+    btnChal.disabled = false;
+  } catch (e) {
+    show(keygenOut, `❌ ${e.message}`, 'error');
+  }
+
+  btnGen.disabled = false;
+});
+
+// ── Download .priv file ──────────────────────────────────────────
+btnDl.addEventListener('click', () => {
+  if (!keypair) return;
+
+  const kid = keyId.value.trim();
+  const header = `-----BEGIN HOMEPAGE FALCON KEY-----\nkey_id: ${kid}\nencrypted: none\n\n`;
+  const footer = '\n-----END HOMEPAGE FALCON KEY-----';
+  const body = base64Encode(keypair.privKey);
+  const content = header + body + footer;
+
+  const blob = new Blob([content], { type: 'application/octet-stream' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'homepage-key.priv';
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+// ── Load .priv file ──────────────────────────────────────────────
+btnLoad.addEventListener('click', () => fileIn.click());
+
+fileIn.addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  try {
+    const text = await file.text();
+    const m = text.match(/key_id:\s*(.+)/);
+    const b = text.match(/^[A-Za-z0-9+/=]+$/m);
+
+    if (!m || !b) {
+      show(keygenOut, 'Invalid key file format', 'error');
+      return;
+    }
+
+    const kid = m[1].trim();
+    keyId.value = kid;
+    const privBytes = base64Decode(b[0].trim());
+
+    // Import the private key for signing
+    const privKey = await crypto.subtle.importKey(
+      'pkcs8', privBytes,
+      { name: 'ECDSA', namedCurve: 'P-384' },
+      false, ['sign']
+    );
+
+    // Extract pub key from the imported key
+    const pubKey = await crypto.subtle.exportKey('raw',
+      await crypto.subtle.importKey('pkcs8', privBytes,
+        { name: 'ECDSA', namedCurve: 'P-384' }, true, ['sign'])
+    );
+    const pubJwk = await crypto.subtle.exportKey('jwk', privKey);
+    // Actually, we need to derive the pub key properly.
+    // For now, just store the priv key — registration needs pub too.
+    // This is a placeholder limitation.
+    keypair = {
+      privKey: privBytes,
+      _signKey: privKey,
+      pubKey: new Uint8Array(pubKey),
+    };
+    btnDl.disabled = false;
+    btnReg.disabled = false;
+    btnChal.disabled = false;
+    show(keygenOut, `✅ Loaded key for "${kid}"`, 'success');
+  } catch (e) {
+    show(keygenOut, `❌ ${e.message}`, 'error');
+  }
+
+  fileIn.value = '';
+});
+
+// ── Register ─────────────────────────────────────────────────────
+btnReg.addEventListener('click', async () => {
+  if (!keypair) return;
+  btnReg.disabled = true;
+  show(keygenOut, 'Registering pub key...', 'info');
+
+  const res = await api('POST', '/api/auth/keys', {
+    key_id: keyId.value.trim(),
+    pub_key: base64Encode(keypair.pubKey),
+  });
+
+  if (res.ok) {
+    show(keygenOut, `✅ Registered "${res.data.key_id}"`, 'success');
+  } else {
+    show(keygenOut, `❌ ${res.data.error}`, 'error');
+    btnReg.disabled = false;
+  }
+});
+
+// ── Challenge ────────────────────────────────────────────────────
+btnChal.addEventListener('click', async () => {
+  const kid = keyId.value.trim();
+  btnChal.disabled = true;
+  show(authOut, 'Requesting challenge...', 'info');
+
+  const res = await api('GET', `/api/auth/challenge?key_id=${encodeURIComponent(kid)}`);
+
+  if (res.ok) {
+    challenge = res.data;
+    show(authOut, `✅ Challenge received\nnonce: ${challenge.nonce.slice(0, 32)}...`, 'success');
+    btnSign.disabled = false;
+  } else {
+    show(authOut, `❌ ${res.data.error}`, 'error');
+    btnChal.disabled = false;
+  }
+});
+
+// ── Sign & Authorize ─────────────────────────────────────────────
+btnSign.addEventListener('click', async () => {
+  if (!challenge || !keypair) return;
+  btnSign.disabled = true;
+  show(authOut, 'Signing nonce...', 'info');
+
+  try {
+    const nonceBytes = base64Decode( /* hex to bytes */ (() => {
+      // convert hex string to bytes
+      const h = challenge.nonce;
+      const b = new Uint8Array(h.length / 2);
+      for (let i = 0; i < b.length; i++)
+        b[i] = parseInt(h.substr(i * 2, 2), 16);
+      return b;
+    })());
+
+    const sigBytes = await signNonce(nonceBytes);
+
+    show(authOut, 'Authorizing...', 'info');
+
+    const res = await api('POST', '/api/auth/authorize', {
+      key_id: keyId.value.trim(),
+      nonce: challenge.nonce,
+      hmac_token: challenge.hmac_token,
+      expires_at: challenge.expires_at,
+      falcon_sig: base64Encode(sigBytes),
+    });
+
+    if (res.ok) {
+      sessionToken = res.data.session_token;
+      sessionData = { capabilities: res.data.capabilities, expires_at: res.data.expires_at };
+      sessTok.textContent = sessionToken.slice(0, 48) + '...';
+      sessCap.textContent = sessionData.capabilities;
+      sessExp.textContent = new Date(sessionData.expires_at * 1000).toLocaleString();
+      sessInfo.classList.remove('hidden');
+      btnApi.disabled = false;
+      show(authOut, `✅ Authorized! Capabilities: ${sessionData.capabilities}`, 'success');
+      btnChal.disabled = false;
+    } else {
+      show(authOut, `❌ ${res.data.error}`, 'error');
+      btnSign.disabled = false;
+      btnChal.disabled = false;
+    }
+  } catch (e) {
+    show(authOut, `❌ ${e.message}`, 'error');
+    btnSign.disabled = false;
+    btnChal.disabled = false;
+  }
+});
+
+// ── Logout All ───────────────────────────────────────────────────
+btnLo.addEventListener('click', async () => {
+  btnLo.disabled = true;
+  const res = await api('POST', '/api/auth/logout-all', {
+    key_id: keyId.value.trim(),
+  });
+
+  if (res.ok) {
+    sessionToken = null;
+    sessionData = null;
+    sessInfo.classList.add('hidden');
+    btnApi.disabled = true;
+    show(authOut, `✅ Logged out all sessions (counter: ${res.data.nonce_counter})`, 'success');
+  } else {
+    show(authOut, `❌ ${res.data.error}`, 'error');
+  }
+
+  btnLo.disabled = false;
+});
+
+// ── Call API ─────────────────────────────────────────────────────
+btnApi.addEventListener('click', async () => {
+  const path = $('api-path').value.trim();
+  btnApi.disabled = true;
+  show(apiOut, 'Calling...', 'info');
+
+  const res = await api('GET', path);
+
+  if (res.ok) {
+    show(apiOut, JSON.stringify(res.data, null, 2), 'success');
+  } else {
+    show(apiOut, `${res.status}: ${res.data.error || JSON.stringify(res.data)}`, 'error');
+  }
+
+  btnApi.disabled = false;
+});
+</script>
+</body>
+</html>

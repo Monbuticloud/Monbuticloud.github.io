@@ -1,0 +1,42 @@
+[general]
+# Network
+host = "0.0.0.0"
+port = 6432
+workers = 4
+
+# Pool sizing (1 user × 10 = 10 backend connections, well below max_connections=50)
+default_pool_size = 10
+min_pool_size = 1
+pooler_mode = "transaction"
+
+# Auth: explicit users in users.toml, no passthrough
+auth_type = "scram"
+passthrough_auth = "disabled"
+
+# Health checks
+healthcheck_interval = 30_000
+idle_healthcheck_interval = 30_000
+idle_healthcheck_delay = 5_000
+healthcheck_timeout = 5_000
+healthcheck_port = 8080
+
+# Timeouts
+checkout_timeout = 5_000
+connect_timeout = 5_000
+idle_timeout = 60_000
+server_lifetime = 86400000
+server_lifetime_jitter = 3_600_000
+
+# Load balancing (single primary, no replicas yet)
+load_balancing_strategy = "round_robin"
+read_write_split = "include_primary"
+
+# Monitoring (optional)
+openmetrics_port = 9630
+
+[[databases]]
+name = "homepage"
+host = "postgres"
+port = 5432
+role = "primary"
+shard = 0

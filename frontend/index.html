@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Homepage — Frontend</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      background: #0e0e10;
+      color: #e4e4e7;
+    }
+    main { max-width: 640px; padding: 2rem; }
+    h1 { font-size: 2rem; font-weight: 300; margin-bottom: 0.5rem; }
+    h1 span { font-weight: 600; }
+    p  { line-height: 1.7; color: #a1a1aa; margin-bottom: 1.5rem; }
+    code {
+      display: block;
+      background: #18181b;
+      border: 1px solid #27272a;
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      font-family: "SF Mono", "Fira Code", monospace;
+      font-size: 0.9rem;
+      line-height: 1.8;
+      white-space: pre;
+      overflow-x: auto;
+    }
+    .comment { color: #6b7280; }
+    .prompt  { color: #22c55e; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>🚧 <span>Frontend</span></h1>
+    <p>
+      This is a placeholder. The frontend is not deployed — build and run
+      it on your local machine instead.
+    </p>
+    <code><span class="comment"># clone &amp; install</span>
+<span class="prompt">$</span> git clone https://github.com/&lt;you&gt;/homepage
+<span class="prompt">$</span> cd homepage/frontend
+<span class="prompt">$</span> npm install
+
+<span class="comment"># dev server</span>
+<span class="prompt">$</span> npm run dev
+
+<span class="comment"># production build</span>
+<span class="prompt">$</span> npm run build
+<span class="prompt">$</span> npm run preview</code>
+  </main>
+</body>
+</html>

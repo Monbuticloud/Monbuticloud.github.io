@@ -151,36 +151,25 @@ const CASTLING_BK: u8 = 4;
 
 const CASTLING_BQ: u8 = 8;
 
-// Named squares for castling (replace magic numbers throughout)
-const E1: u8 = 4;
+// Named squares for castling (replace magic numbers throughout).
+// Square indexing: 0 = a8, 63 = h1 (FEN top-to-bottom).
+// e1 = rank 1 file 4 = (7×8)+4 = 60,  e8 = rank 8 file 4 = (0×8)+4 = 4.
+const E1: u8 = 60;
+const G1: u8 = 62;
+const C1: u8 = 58;
+const F1: u8 = 61;
+const H1: u8 = 63;
+const A1: u8 = 56;
+const D1: u8 = 59;
+const B1: u8 = 57;
 
-const G1: u8 = 6;
-
-const C1: u8 = 2;
-
-const F1: u8 = 5;
-
-const H1: u8 = 7;
-
-const A1: u8 = 0;
-
-const D1: u8 = 3;
-
-const B1: u8 = 1;
-
-const E8: u8 = 60;
-
-const G8: u8 = 62;
-
-const C8: u8 = 58;
-
-const F8: u8 = 61;
-
-const H8: u8 = 63;
-
-const A8: u8 = 56;
-
-const D8: u8 = 59;
+const E8: u8 = 4;
+const G8: u8 = 6;
+const C8: u8 = 2;
+const F8: u8 = 5;
+const H8: u8 = 7;
+const A8: u8 = 0;
+const D8: u8 = 3;
 
 const B8: u8 = 57;
 

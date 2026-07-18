@@ -460,6 +460,12 @@ fn generate_pseudo_legal_moves(board: &Board) -> MoveList {
 
             let piece_type = type_offset + 1;
 
+            // Sanity: the board must have the expected piece at this square.
+            let expected_piece: i8 = if current_side == Color::White { piece_type as i8 } else { -(piece_type as i8) };
+            debug_assert!(board.board[square as usize] == expected_piece,
+                "piece list mismatch: list_idx={}, square={}, expected={}, actual={}",
+                list_idx, square, expected_piece, board.board[square as usize]);
+
             match piece_type {
             1 => {
 
@@ -1776,14 +1782,21 @@ impl TranspositionTable {
 
         let entry = &self.entries[(zobrist as usize) & TT_MASK];
 
+        // Read DATA first, then KEY.
+        // Reasoning: in Lazy SMP, a concurrent store() writes data then key.
+        // If we read key first (match), then read data, a race could give us
+        // data from a *different* position that just overwrote this slot.
+        // Reading data first avoids that: if key matches, data was written
+        // before it (store: data→key), and no subsequent writer can change
+        // data without also changing key (which would make our key check fail).
+        let data = entry.data.load(Ordering::Relaxed);
+
         let stored_key = entry.key.load(Ordering::Acquire);
 
         if stored_key != zobrist {
 
             return None;
         }
-
-        let data = entry.data.load(Ordering::Relaxed);
 
         Some(unpack_tt_data(data))
     }

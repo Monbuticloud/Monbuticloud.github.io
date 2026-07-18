@@ -1,8 +1,8 @@
 # Build stage
 FROM rust:alpine AS builder
 
-# Install UPX (executable compressor). Alpine already ships musl natively.
-RUN apk add --no-cache upx
+# Install build deps: UPX (compressor), postgresql-dev (static libpq for diesel)
+RUN apk add --no-cache upx postgresql-dev
 
 # Detect native architecture
 RUN ARCH=$(uname -m) && \
@@ -28,7 +28,8 @@ RUN rm -rf src
 # cargo to re-link the real binary. All compiled dependencies
 # are preserved in the cache.
 COPY src/ src/
-COPY static/*.html static/*.css static/*.js static/assets/icons.svg static/assets/images/laptop-fullstack-optim.avif static/assets/images/laptop-fullstack-optim_hd.avif /static/
+COPY static/*.html static/*.css static/*.js /static/
+COPY static/assets/ /static/assets/
 
 # ── Minify static assets (builder stage only — zero impact on final image) ──
 RUN apk add --no-cache nodejs npm && \

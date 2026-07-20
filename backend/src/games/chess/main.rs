@@ -371,12 +371,10 @@ fn parse_fen(fen: &str) -> Result<Board, &'static str> {
 
                 add_piece_to_list(&mut board, sq, piece);
 
-                if piece == W_KING {
-
-                    board.wk_sq = sq;
-                } else if piece == B_KING {
-
-                    board.bk_sq = sq;
+                match piece {
+                    W_KING => board.wk_sq = sq,
+                    B_KING => board.bk_sq = sq,
+                    _ => {},
                 }
 
                 file += 1;
@@ -588,54 +586,48 @@ fn generate_pseudo_legal_moves(board: &Board) -> MoveList {
                 // Captures
                 for &file_offset in &[-1, 1] {
 
-                    // File boundary: can't capture off the edge
                     if (file_offset == -1 && square % 8 == 0) || (file_offset == 1 && square % 8 == 7) {
-
                         continue;
                     }
 
                     let target_square = (square as i8 + pawn_direction + file_offset) as Square;
+                    if target_square >= 64 { continue; }
 
-                    if target_square < 64 {
+                    let target = board.board[target_square as usize];
 
-                        let target = board.board[target_square as usize];
+                    let is_opponent = target != EMPTY && (target > 0) != (current_sign == 1);
 
-                        let is_opponent = target != EMPTY && (target > 0) != (current_sign == 1);
+                    let is_en_passant = target_square as i8 == board.en_passant_square;
+                    if !is_opponent && !is_en_passant { continue; }
 
-                        let is_en_passant = target_square as i8 == board.en_passant_square;
+                    if square / 8 == promotion_rank {
 
-                        if is_opponent || is_en_passant {
+                        moves.push(Move::with_promotion(
+                            square,
+                            target_square,
+                            if current_sign == 1 { W_QUEEN } else { B_QUEEN },
+                        ));
 
-                            if square / 8 == promotion_rank {
+                        moves.push(Move::with_promotion(
+                            square,
+                            target_square,
+                            if current_sign == 1 { W_KNIGHT } else { B_KNIGHT },
+                        ));
 
-                                moves.push(Move::with_promotion(
-                                    square,
-                                    target_square,
-                                    if current_sign == 1 { W_QUEEN } else { B_QUEEN },
-                                ));
+                        moves.push(Move::with_promotion(
+                            square,
+                            target_square,
+                            if current_sign == 1 { W_ROOK } else { B_ROOK },
+                        ));
 
-                                moves.push(Move::with_promotion(
-                                    square,
-                                    target_square,
-                                    if current_sign == 1 { W_KNIGHT } else { B_KNIGHT },
-                                ));
+                        moves.push(Move::with_promotion(
+                            square,
+                            target_square,
+                            if current_sign == 1 { W_BISHOP } else { B_BISHOP },
+                        ));
+                    } else {
 
-                                moves.push(Move::with_promotion(
-                                    square,
-                                    target_square,
-                                    if current_sign == 1 { W_ROOK } else { B_ROOK },
-                                ));
-
-                                moves.push(Move::with_promotion(
-                                    square,
-                                    target_square,
-                                    if current_sign == 1 { W_BISHOP } else { B_BISHOP },
-                                ));
-                            } else {
-
-                                moves.push(Move::new(square, target_square));
-                            }
-                        }
+                        moves.push(Move::new(square, target_square));
                     }
                 }
             },
@@ -645,25 +637,16 @@ fn generate_pseudo_legal_moves(board: &Board) -> MoveList {
                 for &offset in &[-17, -15, -10, -6, 6, 10, 15, 17] {
 
                     let target_square = square as i8 + offset;
+                    if target_square < 0 || target_square >= 64 { continue; }
 
-                    if target_square >= 0 && target_square < 64 {
+                    // File-wrap check: knight moves change file by at most 2
+                    let from_file = square % 8;
+                    let to_file = target_square as usize % 8;
+                    if (from_file as i8 - to_file as i8).abs() > 2 { continue; }
 
-                        // File-wrap check: knight moves change file by at most 2
-                        let from_file = square % 8;
-
-                        let to_file = target_square as usize % 8;
-
-                        if (from_file as i8 - to_file as i8).abs() > 2 {
-
-                            continue;
-                        }
-
-                        let target = board.board[target_square as usize];
-
-                        if target == EMPTY || (target > 0) != (current_sign == 1) {
-
-                            moves.push(Move::new(square, target_square as u8));
-                        }
+                    let target = board.board[target_square as usize];
+                    if target == EMPTY || (target > 0) != (current_sign == 1) {
+                        moves.push(Move::new(square, target_square as u8));
                     }
                 }
             },
@@ -804,15 +787,11 @@ fn generate_pseudo_legal_moves(board: &Board) -> MoveList {
                 for &offset in &[-9, -8, -7, -1, 1, 7, 8, 9] {
 
                     let target_square = square as i8 + offset;
+                    if target_square < 0 || target_square >= 64 { continue; }
 
-                    if target_square >= 0 && target_square < 64 {
-
-                        let target = board.board[target_square as usize];
-
-                        if target == EMPTY || (target > 0) != (current_sign == 1) {
-
-                            moves.push(Move::new(square, target_square as u8));
-                        }
+                    let target = board.board[target_square as usize];
+                    if target == EMPTY || (target > 0) != (current_sign == 1) {
+                        moves.push(Move::new(square, target_square as u8));
                     }
                 }
 
@@ -1286,30 +1265,26 @@ fn make_move(board: &mut Board, mv: Move) -> MoveUndo {
 
         board.hash ^= ZOBRIST.keys[zobrist_key(captured_pawn, pawn_sq)];
     }
-
-    // Castling rook movement
+    // Castling rook movement (hash update)
     if is_king {
-
-        if mv.from == E1 && mv.to == G1 {
-
-            board.hash ^= ZOBRIST.keys[zobrist_key(W_ROOK, H1)];
-
-            board.hash ^= ZOBRIST.keys[zobrist_key(W_ROOK, F1)];
-        } else if mv.from == E1 && mv.to == C1 {
-
-            board.hash ^= ZOBRIST.keys[zobrist_key(W_ROOK, A1)];
-
-            board.hash ^= ZOBRIST.keys[zobrist_key(W_ROOK, D1)];
-        } else if mv.from == E8 && mv.to == G8 {
-
-            board.hash ^= ZOBRIST.keys[zobrist_key(B_ROOK, H8)];
-
-            board.hash ^= ZOBRIST.keys[zobrist_key(B_ROOK, F8)];
-        } else if mv.from == E8 && mv.to == C8 {
-
-            board.hash ^= ZOBRIST.keys[zobrist_key(B_ROOK, A8)];
-
-            board.hash ^= ZOBRIST.keys[zobrist_key(B_ROOK, D8)];
+        match (mv.from, mv.to) {
+            (E1, G1) => {
+                board.hash ^= ZOBRIST.keys[zobrist_key(W_ROOK, H1)];
+                board.hash ^= ZOBRIST.keys[zobrist_key(W_ROOK, F1)];
+            },
+            (E1, C1) => {
+                board.hash ^= ZOBRIST.keys[zobrist_key(W_ROOK, A1)];
+                board.hash ^= ZOBRIST.keys[zobrist_key(W_ROOK, D1)];
+            },
+            (E8, G8) => {
+                board.hash ^= ZOBRIST.keys[zobrist_key(B_ROOK, H8)];
+                board.hash ^= ZOBRIST.keys[zobrist_key(B_ROOK, F8)];
+            },
+            (E8, C8) => {
+                board.hash ^= ZOBRIST.keys[zobrist_key(B_ROOK, A8)];
+                board.hash ^= ZOBRIST.keys[zobrist_key(B_ROOK, D8)];
+            },
+            _ => {},
         }
     }
 
@@ -1483,12 +1458,10 @@ fn unmake_move(board: &mut Board, mv: Move, undo: MoveUndo) {
     // Restore king square if the moved piece was a king
     let restored_piece = board.board[mv.from as usize];
 
-    if restored_piece == W_KING {
-
-        board.wk_sq = mv.from;
-    } else if restored_piece == B_KING {
-
-        board.bk_sq = mv.from;
+    match restored_piece {
+        W_KING => board.wk_sq = mv.from,
+        B_KING => board.bk_sq = mv.from,
+        _ => {},
     }
 
     validate_piece_lists(board, &format!("unmake_move({},{})", mv.from, mv.to));
@@ -2051,25 +2024,17 @@ fn pinned_dir(square: u8, info: &PinnedInfo) -> Option<i8> {
 fn move_stays_on_pin(mv: &Move, pin_dir: i8) -> bool {
     let dx = (mv.to as i8 % 8) - (mv.from as i8 % 8);
     let dy = (mv.to as i8 / 8) - (mv.from as i8 / 8);
-    let step = if dx > 0 && dy > 0 {
-        9
-    } else if dx > 0 && dy < 0 {
-        -7
-    } else if dx < 0 && dy > 0 {
-        7
-    } else if dx < 0 && dy < 0 {
-        -9
-    } else if dx > 0 {
-        1
-    } else if dx < 0 {
-        -1
-    } else if dy > 0 {
-        8
-    } else if dy < 0 {
-        -8
-    } else {
-        // from == to (shouldn't happen for a real move)
-        return true;
+    if dx == 0 && dy == 0 { return true; }
+    let step = match (dx.signum(), dy.signum()) {
+        (1, 1) => 9,
+        (1, -1) => -7,
+        (-1, 1) => 7,
+        (-1, -1) => -9,
+        (1, 0) => 1,
+        (-1, 0) => -1,
+        (0, 1) => 8,
+        (0, -1) => -8,
+        _ => unreachable!(),
     };
     step == pin_dir || step == -pin_dir
 }

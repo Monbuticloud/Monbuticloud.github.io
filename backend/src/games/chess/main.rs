@@ -635,7 +635,7 @@ fn generate_pseudo_legal_moves(board: &Board) -> MoveList {
                 for &offset in &[-17, -15, -10, -6, 6, 10, 15, 17] {
 
                     let target_square = square as i8 + offset;
-                    if target_square < 0 || target_square >= 64 { continue; }
+                    if !(0..64).contains(&target_square) { continue; }
 
                     // File-wrap check: knight moves change file by at most 2
                     let from_file = square % 8;
@@ -665,7 +665,7 @@ fn generate_pseudo_legal_moves(board: &Board) -> MoveList {
 
                     let mut current_square = square as i8 + direction;
 
-                    while current_square >= 0 && current_square < 64 {
+                    while (0..64).contains(&current_square) {
 
                         let target = board.board[current_square as usize];
 
@@ -706,7 +706,7 @@ fn generate_pseudo_legal_moves(board: &Board) -> MoveList {
 
                     let mut current_square = square as i8 + direction;
 
-                    while current_square >= 0 && current_square < 64 {
+                    while (0..64).contains(&current_square) {
 
                         let target = board.board[current_square as usize];
 
@@ -751,7 +751,7 @@ fn generate_pseudo_legal_moves(board: &Board) -> MoveList {
 
                     let mut current_square = square as i8 + direction;
 
-                    while current_square >= 0 && current_square < 64 {
+                    while (0..64).contains(&current_square) {
 
                         let target = board.board[current_square as usize];
 
@@ -785,7 +785,7 @@ fn generate_pseudo_legal_moves(board: &Board) -> MoveList {
                 for &offset in &[-9, -8, -7, -1, 1, 7, 8, 9] {
 
                     let target_square = square as i8 + offset;
-                    if target_square < 0 || target_square >= 64 { continue; }
+                    if !(0..64).contains(&target_square) { continue; }
 
                     let target = board.board[target_square as usize];
                     if target == EMPTY || (target > 0) != (current_sign == 1) {
@@ -871,7 +871,7 @@ fn is_square_attacked(board: &Board, square: Square, by_color: Color) -> bool {
 
         let from = square as i8 + offset;
 
-        if from >= 0 && from < 64 {
+        if (0..64).contains(&from) {
 
             let piece = board.board[from as usize];
 
@@ -887,7 +887,7 @@ fn is_square_attacked(board: &Board, square: Square, by_color: Color) -> bool {
 
         let from = square as i8 + offset;
 
-        if from >= 0 && from < 64 {
+        if (0..64).contains(&from) {
 
             let piece = board.board[from as usize];
 
@@ -903,7 +903,7 @@ fn is_square_attacked(board: &Board, square: Square, by_color: Color) -> bool {
 
         let from = square as i8 + offset;
 
-        if from >= 0 && from < 64 {
+        if (0..64).contains(&from) {
 
             let piece = board.board[from as usize];
 
@@ -919,7 +919,7 @@ fn is_square_attacked(board: &Board, square: Square, by_color: Color) -> bool {
 
         let mut current_square = square as i8 + direction;
 
-        while current_square >= 0 && current_square < 64 {
+        while (0..64).contains(&current_square) {
 
             let piece = board.board[current_square as usize];
 
@@ -948,7 +948,7 @@ fn is_square_attacked(board: &Board, square: Square, by_color: Color) -> bool {
 
         let mut current_square = square as i8 + direction;
 
-        while current_square >= 0 && current_square < 64 {
+        while (0..64).contains(&current_square) {
 
             let piece = board.board[current_square as usize];
 
@@ -1957,7 +1957,7 @@ fn compute_pins(board: &Board) -> PinnedInfo {
 
         let mut found_piece = None;
 
-        while sq >= 0 && sq < 64 {
+        while (0..64).contains(&sq) {
 
             let piece = board.board[sq as usize];
 

@@ -2150,9 +2150,7 @@ fn search(board: &mut Board, depth: usize, mut alpha: i32, beta: i32, killers: &
 
     let secondary_killer = killers[ply][1];
 
-    for i in 0..pseudo_moves.count {
-
-        let mv = pseudo_moves.moves[i];
+    for (i, &mv) in pseudo_moves.moves[..pseudo_moves.count].iter().enumerate() {
 
         if board.board[mv.to as usize] != EMPTY {
 
@@ -2235,9 +2233,7 @@ fn search(board: &mut Board, depth: usize, mut alpha: i32, beta: i32, killers: &
         compute_pins(board)
     };
 
-    for i in 0..pseudo_moves.count {
-
-        let mv = pseudo_moves.moves[i];
+    for (i, &mv) in pseudo_moves.moves[..pseudo_moves.count].iter().enumerate() {
 
         let is_quiet = board.board[mv.to as usize] == EMPTY && mv.promotion == 0;
 

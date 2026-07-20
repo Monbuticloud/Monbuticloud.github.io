@@ -2133,9 +2133,7 @@ fn search(board: &mut Board, depth: usize, mut alpha: i32, beta: i32, killers: &
 
         let tt_promo = decode_promotion(promo_code, board.side_to_move);
 
-        for i in 0..pseudo_moves.count {
-
-            let mv = pseudo_moves.moves[i];
+    for (i, mv) in pseudo_moves.moves[..pseudo_moves.count].iter().enumerate() {
 
             if mv.from == tt_from && mv.to == tt_to && mv.promotion == tt_promo {
 
@@ -2184,17 +2182,9 @@ fn search(board: &mut Board, depth: usize, mut alpha: i32, beta: i32, killers: &
 
         while j > 0 && move_scores[j] > move_scores[j - 1] {
 
-            let higher_score = move_scores[j];
+            move_scores.swap(j, j - 1);
 
-            move_scores[j] = move_scores[j - 1];
-
-            move_scores[j - 1] = higher_score;
-
-            let higher_move = pseudo_moves.moves[j];
-
-            pseudo_moves.moves[j] = pseudo_moves.moves[j - 1];
-
-            pseudo_moves.moves[j - 1] = higher_move;
+            pseudo_moves.moves.swap(j, j - 1);
 
             j -= 1;
         }

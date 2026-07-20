@@ -167,7 +167,7 @@ fn validate_piece_lists(board: &Board, label: &str) {
             if sq >= 64 { continue; }
             let actual = board.board[sq as usize];
             if actual != expected_piece {
-                debug_assert!(false, "MISMATCH {} list[{}][{}] sq={} expected={} actual={}", label, idx, i, sq, expected_piece, actual);
+                debug_assert!(false, "MISMATCH {} list[{}][{}] sq={} expected={} actual={}", label, idx, entry_idx, sq, expected_piece, actual);
                 return;
             }
             // Check for duplicates

@@ -796,55 +796,47 @@ fn generate_pseudo_legal_moves(board: &Board) -> MoveList {
                 // Castling
                 if current_side == Color::White {
 
-                    if (board.castling_rights & CASTLING_WK) != 0 {
+                    if (board.castling_rights & CASTLING_WK) != 0
+                        && board.board[F1 as usize] == EMPTY
+                        && board.board[G1 as usize] == EMPTY
+                        && board.board[H1 as usize] == W_ROOK
+                        && board.board[E1 as usize] == W_KING
+                    {
 
-                        if board.board[F1 as usize] == EMPTY
-                            && board.board[G1 as usize] == EMPTY
-                            && board.board[H1 as usize] == W_ROOK
-                            && board.board[E1 as usize] == W_KING
-                        {
-
-                            moves.push(Move::new(E1, G1));
-                        }
+                        moves.push(Move::new(E1, G1));
                     }
 
-                    if (board.castling_rights & CASTLING_WQ) != 0 {
+                    if (board.castling_rights & CASTLING_WQ) != 0
+                        && board.board[B1 as usize] == EMPTY
+                        && board.board[C1 as usize] == EMPTY
+                        && board.board[D1 as usize] == EMPTY
+                        && board.board[A1 as usize] == W_ROOK
+                        && board.board[E1 as usize] == W_KING
+                    {
 
-                        if board.board[B1 as usize] == EMPTY
-                            && board.board[C1 as usize] == EMPTY
-                            && board.board[D1 as usize] == EMPTY
-                            && board.board[A1 as usize] == W_ROOK
-                            && board.board[E1 as usize] == W_KING
-                        {
-
-                            moves.push(Move::new(E1, C1));
-                        }
+                        moves.push(Move::new(E1, C1));
                     }
                 } else {
 
-                    if (board.castling_rights & CASTLING_BK) != 0 {
+                    if (board.castling_rights & CASTLING_BK) != 0
+                        && board.board[F8 as usize] == EMPTY
+                        && board.board[G8 as usize] == EMPTY
+                        && board.board[H8 as usize] == B_ROOK
+                        && board.board[E8 as usize] == B_KING
+                    {
 
-                        if board.board[F8 as usize] == EMPTY
-                            && board.board[G8 as usize] == EMPTY
-                            && board.board[H8 as usize] == B_ROOK
-                            && board.board[E8 as usize] == B_KING
-                        {
-
-                            moves.push(Move::new(E8, G8));
-                        }
+                        moves.push(Move::new(E8, G8));
                     }
 
-                    if (board.castling_rights & CASTLING_BQ) != 0 {
+                    if (board.castling_rights & CASTLING_BQ) != 0
+                        && board.board[B8 as usize] == EMPTY
+                        && board.board[C8 as usize] == EMPTY
+                        && board.board[D8 as usize] == EMPTY
+                        && board.board[A8 as usize] == B_ROOK
+                        && board.board[E8 as usize] == B_KING
+                    {
 
-                        if board.board[B8 as usize] == EMPTY
-                            && board.board[C8 as usize] == EMPTY
-                            && board.board[D8 as usize] == EMPTY
-                            && board.board[A8 as usize] == B_ROOK
-                            && board.board[E8 as usize] == B_KING
-                        {
-
-                            moves.push(Move::new(E8, C8));
-                        }
+                        moves.push(Move::new(E8, C8));
                     }
                 }
             },

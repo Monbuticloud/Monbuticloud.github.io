@@ -1470,7 +1470,7 @@ fn unmake_move(board: &mut Board, mv: Move, undo: MoveUndo) {
 }
 
 // -----------------------------------------------------------------------------
-// Evaluation (piece lists — no heap, no SIMD overhead)
+// Evaluation
 // -----------------------------------------------------------------------------
 
 fn evaluate_board(board: &Board) -> i32 {

@@ -101,10 +101,10 @@ Monorepo for Monbuticloud's personal portfolio site and projects.
 
 ## Local Contracts
 
-1. **Backend**: Run with `docker compose up --build` from `backend/`. Depends on Docker Desktop, `libpq` for compilation, `wasm-bindgen` + `wasm-opt` for falcon-wasm.
+1. **Backend**: Run with `docker compose up --build` from `backend/`. Depends on Docker Desktop, `wasm-bindgen` + `wasm-opt` for falcon-wasm.
 2. **Frontend**: Static HTML stub. Once built, will deploy from `frontend/` to GitHub Pages.
 3. **Auth**: FALCON pub key is public. Private key generated client-side, never uploaded. HMAC stateless sessions with nonce_counter revocation.
-4. **Chess**: Depth 1–12 only (400 on invalid depth). Lazy SMP via `rayon::scope`. Semaphore backpressure → 503.
+4. **Chess**: Depth 1–15 (13–15 gated behind FALCON auth, not wired yet). Lazy SMP via `rayon::scope`. Semaphore backpressure → 503.
 
 ## Work Guidance
 

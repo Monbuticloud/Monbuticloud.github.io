@@ -413,7 +413,7 @@ async fn get_chess_completion(params: Query<HashMap<String, String>>) -> Respons
     let depth = match params.get("depth") {
         Some(v) => match v.parse::<usize>() {
             Ok(d) if (1..=15).contains(&d) => d,
-            _ => return json_body(StatusCode::BAD_REQUEST, r#"{"error":"'depth' must be 1–12"}"#.into()),
+            _ => return json_body(StatusCode::BAD_REQUEST, r#"{"error":"'depth' must be 1–15"}"#.into()),
         },
         None => 5,
     };

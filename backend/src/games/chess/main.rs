@@ -175,17 +175,19 @@ fn validate_piece_lists(board: &Board, label: &str) {
 fn add_piece_to_list(board: &mut Board, sq: u8, piece: i8) {
     let idx = piece_to_list_idx(piece);
     let count = board.piece_count[idx];
-    // Guard against duplicates (can arise from stale entries after corruption)
     for i in 0..count {
         if board.piece_list[idx][i as usize] == sq {
-            return; // already in list
+            let bt = std::backtrace::Backtrace::force_capture();
+            debug_assert!(false,
+                "duplicate sq={} in list[{}] count={} existing={:?}\nbacktrace:\n{}",
+                sq, idx, count, &board.piece_list[idx][..count as usize], bt);
+            return;
         }
     }
     if (count as usize) < board.piece_list[idx].len() {
         board.piece_list[idx][count as usize] = sq;
         board.piece_count[idx] = count + 1;
     }
-    // Silently drop if list is full (pathological promotion scenarios)
 }
 
 // Piece-square tables (from Sunfish, simplified)
@@ -1057,6 +1059,9 @@ fn make_move(board: &mut Board, mv: Move) -> MoveUndo {
         board.hash ^= ZOBRIST.keys[773 + (saved_ep_square as usize & 7)];
     }
 
+    // Track whether a list rebuild is needed after the board update
+    let mut list_needs_rebuild = EMPTY;
+
     // Moving piece leaves its from square
     board.hash ^= ZOBRIST.keys[zobrist_key(moving_piece, mv.from)];
 
@@ -1066,12 +1071,11 @@ fn make_move(board: &mut Board, mv: Move) -> MoveUndo {
         board.hash ^= ZOBRIST.keys[zobrist_key(captured, mv.to)];
 
         // Remove captured piece from list. If the list was corrupt and
-        // the piece isn't found, DON'T rebuild — the piece is still on
-        // the board (board hasn't been updated yet), so a rebuild would
-        // just re-add it, creating a stale entry when the board update
-        // overwrites it moments later. Accept the miss — the stale entry
-        // (if any) will be overwritten by a future add.
-        remove_piece_from_list(board, mv.to, captured);
+        // the piece isn't found, we'll rebuild AFTER the board update
+        // (when the captured piece is no longer on the board).
+        if !remove_piece_from_list(board, mv.to, captured) {
+            list_needs_rebuild = captured;
+        }
     }
 
     // ── Board changes ──
@@ -1080,6 +1084,13 @@ fn make_move(board: &mut Board, mv: Move) -> MoveUndo {
     board.board[mv.to as usize] = moving_piece;
 
     board.board[mv.from as usize] = EMPTY;
+
+    // If a capture remove failed (list was corrupt), rebuild the list
+    // now — the board has overwritten the captured piece, so the rebuild
+    // won't include it.
+    if list_needs_rebuild != EMPTY {
+        rebuild_piece_list(board, list_needs_rebuild);
+    }
 
     // Piece list: move piece from source to destination
     if remove_piece_or_rebuild(board, mv.from, moving_piece) {
@@ -1429,8 +1440,20 @@ fn unmake_move(board: &mut Board, mv: Move, undo: MoveUndo) {
 
         board.board[captured_pawn_square as usize] = captured_pawn;
 
-        // Piece list: restore captured pawn
-        add_piece_to_list(board, captured_pawn_square, captured_pawn);
+        // Piece list: restore captured pawn (check for duplicates
+        // to handle stale entries from previous list corruption).
+        let idx = piece_to_list_idx(captured_pawn);
+        let mut already_present = false;
+        for i in 0..board.piece_count[idx] {
+            if board.piece_list[idx][i as usize] == captured_pawn_square {
+                already_present = true;
+                break;
+            }
+        }
+        if !already_present {
+
+            add_piece_to_list(board, captured_pawn_square, captured_pawn);
+        }
     }
 
     // Castling: restore the rook to its original square

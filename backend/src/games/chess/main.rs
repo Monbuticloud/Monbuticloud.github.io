@@ -2331,8 +2331,8 @@ fn best_move_single(fen: &str, depth: usize) -> Option<String> {
     let mut killers = [[Move { from: 0, to: 0, promotion: 0 }; 2]; MAX_PLY];
     let mut best = Move { from: 0, to: 0, promotion: 0 };
 
-    for d in 1..=depth {
-        let (_score, mv) = search(&mut local_board, d, -30000, 30000, &mut killers, 0);
+    for current_depth in 1..=depth {
+        let (_score, mv) = search(&mut local_board, current_depth, -30000, 30000, &mut killers, 0);
         let is_valid = mv.from != mv.to || mv.promotion != 0;
         if is_valid {
             best = mv;
@@ -2378,16 +2378,16 @@ pub fn best_move(fen: &str, depth: usize) -> Option<String> {
             let mut killers = [[Move { from: 0, to: 0, promotion: 0 }; 2]; MAX_PLY];
             let mut best = Move { from: 0, to: 0, promotion: 0 };
 
-            for d in 1..=depth {
+            for current_depth in 1..=depth {
                 // Validate before search
-                validate_piece_lists!(&local_board, "leader before depth {}", d);
-                let (score, mv) = search(&mut local_board, d, -30000, 30000, &mut killers, 0);
+                validate_piece_lists!(&local_board, "leader before depth {}", current_depth);
+                let (score, mv) = search(&mut local_board, current_depth, -30000, 30000, &mut killers, 0);
                 // Validate after search
-                validate_piece_lists!(&local_board, "leader after depth {}", d);
+                validate_piece_lists!(&local_board, "leader after depth {}", current_depth);
                 let is_valid = mv.from != mv.to || mv.promotion != 0;
 
                 crate::log_debug(crate::LogMsg::ChessDepth {
-                    depth: d,
+                    depth: current_depth,
                     score,
                     best: if is_valid { square_name(mv.from) + &square_name(mv.to) } else { "none".into() },
                     is_valid,
@@ -2408,13 +2408,13 @@ pub fn best_move(fen: &str, depth: usize) -> Option<String> {
                 let mut local_board = board.clone();
                 let mut killers = [[Move { from: 0, to: 0, promotion: 0 }; 2]; MAX_PLY];
 
-                for d in 1..=depth {
+                for current_depth in 1..=depth {
                     if leader_finished.load(Ordering::Acquire) {
                         break;
                     }
-                    validate_piece_lists!(&local_board, "helper before depth {}", d);
-                    search(&mut local_board, d, -30000, 30000, &mut killers, 0);
-                    validate_piece_lists!(&local_board, "helper after depth {}", d);
+                    validate_piece_lists!(&local_board, "helper before depth {}", current_depth);
+                    search(&mut local_board, current_depth, -30000, 30000, &mut killers, 0);
+                    validate_piece_lists!(&local_board, "helper after depth {}", current_depth);
                 }
             });
         }

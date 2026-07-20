@@ -584,7 +584,7 @@ fn generate_pseudo_legal_moves(board: &Board) -> MoveList {
                 // Captures
                 for &file_offset in &[-1, 1] {
 
-                    if (file_offset == -1 && square % 8 == 0) || (file_offset == 1 && square % 8 == 7) {
+                    if (file_offset == -1 && square.is_multiple_of(8)) || (file_offset == 1 && square % 8 == 7) {
                         continue;
                     }
 
@@ -658,7 +658,7 @@ fn generate_pseudo_legal_moves(board: &Board) -> MoveList {
 
                     let moving_right = direction == -7 || direction == 9;
 
-                    if (moving_left && square % 8 == 0) || (moving_right && square % 8 == 7) {
+                    if (moving_left && square.is_multiple_of(8)) || (moving_right && square % 8 == 7) {
 
                         continue;
                     }
@@ -682,7 +682,7 @@ fn generate_pseudo_legal_moves(board: &Board) -> MoveList {
                         moves.push(Move::new(square, current_square as u8));
 
                         // File wrap check before next step
-                        if (moving_left && (current_square as usize) % 8 == 0)
+                        if (moving_left && (current_square as usize).is_multiple_of(8))
                             || (moving_right && (current_square as usize) % 8 == 7)
                         {
 
@@ -699,7 +699,7 @@ fn generate_pseudo_legal_moves(board: &Board) -> MoveList {
                 for &direction in &[-8, -1, 1, 8] {
 
                     // File boundary: horizontal moves can't wrap off the edge
-                    if (direction == -1 && square % 8 == 0) || (direction == 1 && square % 8 == 7) {
+                    if (direction == -1 && square.is_multiple_of(8)) || (direction == 1 && square % 8 == 7) {
 
                         continue;
                     }
@@ -723,7 +723,7 @@ fn generate_pseudo_legal_moves(board: &Board) -> MoveList {
                         moves.push(Move::new(square, current_square as u8));
 
                         // File wrap check before next horizontal step
-                        if (direction == -1 && (current_square as usize) % 8 == 0)
+                        if (direction == -1 && (current_square as usize).is_multiple_of(8))
                             || (direction == 1 && (current_square as usize) % 8 == 7)
                         {
 
@@ -744,7 +744,7 @@ fn generate_pseudo_legal_moves(board: &Board) -> MoveList {
 
                     let moving_right = direction == -7 || direction == 1 || direction == 9;
 
-                    if (moving_left && square % 8 == 0) || (moving_right && square % 8 == 7) {
+                    if (moving_left && square.is_multiple_of(8)) || (moving_right && square % 8 == 7) {
 
                         continue;
                     }
@@ -768,7 +768,7 @@ fn generate_pseudo_legal_moves(board: &Board) -> MoveList {
                         moves.push(Move::new(square, current_square as u8));
 
                         // File wrap check before next step
-                        if (moving_left && (current_square as usize) % 8 == 0)
+                        if (moving_left && (current_square as usize).is_multiple_of(8))
                             || (moving_right && (current_square as usize) % 8 == 7)
                         {
 

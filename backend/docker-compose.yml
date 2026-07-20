@@ -38,7 +38,7 @@ services:
     volumes:
       - ./config/pgdog/pgdog.toml:/etc/pgdog/pgdog.toml:ro
       - ./config/pgdog/users.toml:/etc/pgdog/users.toml:ro
-    command: ["--config", "/etc/pgdog/pgdog.toml", "--users", "/etc/pgdog/users.toml"]
+    command: ["/usr/local/bin/pgdog", "--config", "/etc/pgdog/pgdog.toml", "--users", "/etc/pgdog/users.toml"]
     depends_on:
       postgres:
         condition: service_healthy

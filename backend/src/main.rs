@@ -11,7 +11,7 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 static CHESS_POOL: std::sync::LazyLock<rayon::ThreadPool> = std::sync::LazyLock::new(|| {
     let cpus = std::thread::available_parallelism().map_or(4, |n| n.get());
     rayon::ThreadPoolBuilder::new()
-        .num_threads(cpus.max(32).min(128))
+        .num_threads(cpus.clamp(32, 128))
         .thread_name(|i| format!("chess-{i}"))
         .stack_size(256 * 1024)
         .build()
@@ -25,7 +25,7 @@ static CHESS_POOL: std::sync::LazyLock<rayon::ThreadPool> = std::sync::LazyLock:
 /// On a 128‑core machine: pool=128 → 32 permits.
 static CHESS_SEMAPHORE: std::sync::LazyLock<Semaphore> = std::sync::LazyLock::new(|| {
     let cpus = std::thread::available_parallelism().map_or(4, |n| n.get());
-    let pool_size = cpus.max(32).min(128);
+    let pool_size = cpus.clamp(32, 128);
     Semaphore::new(pool_size / 4)
 });
 
@@ -159,12 +159,13 @@ pub(crate) fn log_debug(msg: LogMsg) {
     log_msg(LogLevel::Debug, msg);
 }
 #[allow(dead_code)]
-
 pub(crate) fn log_error(msg: LogMsg) {
     log_msg(LogLevel::Error, msg);
 }
 
-static FILE_CACHE: LazyLock<RwLock<HashMap<&'static str, (StatusCode, String, &'static mime::Mime)>>> =
+type FileCache = LazyLock<RwLock<HashMap<&'static str, (StatusCode, String, &'static mime::Mime)>>>;
+
+static FILE_CACHE: FileCache =
     LazyLock::new(|| RwLock::new(HashMap::new()));
 
 // ── Resource monitor (reads /proc/self/status and /proc/self/stat) ──
@@ -348,7 +349,6 @@ fn mime_for_path(path: &str) -> &'static mime::Mime {
 }
 
 #[inline(always)]
-
 async fn serve_static(path: &'static str) -> Response<Body> {
     if let Some(cached) = FILE_CACHE.read().unwrap().get(path) {
         let (status, content, mime) = cached;
@@ -403,7 +403,6 @@ fn json_body(status: StatusCode, body: String) -> Response<Body> {
 ///
 /// `depth`: 1–12 for anonymous, 13–15 gated behind auth (when implemented).
 /// Default 5. Runs on a blocking thread so the async runtime isn't starved.
-
 async fn get_chess_completion(params: Query<HashMap<String, String>>) -> Response<Body> {
     let fen = match params.get("fen") {
         Some(f) => f,

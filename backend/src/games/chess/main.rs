@@ -335,7 +335,7 @@ fn parse_fen(fen: &str) -> Result<Board, &'static str> {
 
         for character in row.chars() {
 
-            if character.is_digit(10) {
+            if character.is_ascii_digit() {
 
                 let count = character.to_digit(10).expect("validated digit") as usize;
 
@@ -452,9 +452,9 @@ fn parse_fen(fen: &str) -> Result<Board, &'static str> {
 
 fn square_name(square: Square) -> String {
 
-    let file = (square % 8) as u8;
+    let file = square % 8;
 
-    let rank = 8 - (square / 8) as u8;
+    let rank = 8 - square / 8;
 
     format!("{}{}", (b'a' + file) as char, rank)
 }
@@ -1216,7 +1216,7 @@ fn make_move(board: &mut Board, mv: Move) -> MoveUndo {
     // Update en passant
     if board.board[mv.to as usize].abs() == 1 && (mv.to as i8 - mv.from as i8).abs() == 16 {
 
-        board.en_passant_square = ((mv.from as i8 + mv.to as i8) / 2) as i8;
+        board.en_passant_square = (mv.from as i8 + mv.to as i8) / 2;
     } else {
 
         board.en_passant_square = -1;
@@ -1789,7 +1789,6 @@ const TT_MASK: usize = (1 << TT_BITS) - 1;
 ///   key:   full 64‑bit Zobrist hash
 ///   data:  score(32) | best_move_packed(16) | depth(8) | flags(8)
 #[repr(C, align(8))]
-
 struct TTEntry {
     key: AtomicU64,
     data: AtomicU64,
@@ -2370,7 +2369,7 @@ pub fn best_move(fen: &str, depth: usize) -> Option<String> {
     // CHESS_POOL threads — zero per‑request thread overhead,
     // and concurrent requests share the pool without oversubscription.
     let num_threads = std::thread::available_parallelism()
-        .map_or(2, |n| (n.get() as usize).min(4));
+        .map_or(2, |n| n.get().min(4));
 
     let leader_finished = AtomicBool::new(false);
     let best_move_cell = std::sync::Mutex::new(None::<Move>);

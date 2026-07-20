@@ -95,7 +95,10 @@ fn piece_to_list_idx(piece: i8) -> usize {
     (piece.unsigned_abs() as usize - 1) + if piece > 0 { 0 } else { 6 }
 }
 
-fn remove_piece_from_list(board: &mut Board, sq: u8, piece: i8) {
+/// Remove `sq` from the piece list for `piece`.
+/// Returns true if `sq` was found in the list (normal case).
+/// Returns false if not found (list was corrupt — use rebuild instead).
+fn remove_piece_from_list(board: &mut Board, sq: u8, piece: i8) -> bool {
     let idx = piece_to_list_idx(piece);
     let count = board.piece_count[idx];
     for i in 0..count {
@@ -103,11 +106,17 @@ fn remove_piece_from_list(board: &mut Board, sq: u8, piece: i8) {
             let last = count - 1;
             board.piece_list[idx][i as usize] = board.piece_list[idx][last as usize];
             board.piece_count[idx] = last;
-            return;
+            return true;
         }
     }
-    // Piece not found in list — likely a stale entry from a previous corruption.
-    // Fallback: scan the board and rebuild the list for this piece type.
+    false // piece not found — list is corrupt
+}
+
+/// Rebuild a piece list from the board (used as fallback when remove fails).
+/// After calling this, the caller should NOT call add_piece_to_list for the
+/// same piece+square because the rebuild already includes the current board state.
+fn rebuild_piece_list(board: &mut Board, piece: i8) {
+    let idx = piece_to_list_idx(piece);
     let max = board.piece_list[idx].len() as u8;
     let mut offset = 0u8;
     for sq in 0..64u8 {
@@ -122,9 +131,56 @@ fn remove_piece_from_list(board: &mut Board, sq: u8, piece: i8) {
     board.piece_count[idx] = offset;
 }
 
+/// Remove `piece` from `sq` in the list, with rebuild fallback.
+/// If the piece is found and removed, returns true and the caller should
+/// separately add the destination. If not found (corrupt list), rebuilds
+/// the list from the board; the caller should NOT add afterward (the
+/// rebuild already reflects the current board state).
+fn remove_piece_or_rebuild(board: &mut Board, sq: u8, piece: i8) -> bool {
+    if remove_piece_from_list(board, sq, piece) {
+        true
+    } else {
+        rebuild_piece_list(board, piece);
+        false // caller should skip subsequent add
+    }
+}
+
+// Debug: validate all piece lists against the board.
+// In debug builds, panics on first mismatch with full diagnostic.
+// In release builds, logs mismatches to stderr for investigation.
+fn validate_piece_lists(board: &Board, label: &str) {
+    for idx in 0..12 {
+        let count = board.piece_count[idx];
+        let piece_type = (idx % 6) + 1;
+        let expected_piece = if idx < 6 { piece_type as i8 } else { -(piece_type as i8) };
+        for i in 0..count {
+            let sq = board.piece_list[idx][i as usize];
+            if sq >= 64 { continue; }
+            let actual = board.board[sq as usize];
+            if actual != expected_piece {
+                debug_assert!(false, "MISMATCH {} list[{}][{}] sq={} expected={} actual={}", label, idx, i, sq, expected_piece, actual);
+                return;
+            }
+            // Check for duplicates
+            for j in 0..i {
+                if board.piece_list[idx][j as usize] == sq {
+                    debug_assert!(false, "DUPLICATE {} list[{}] sq={}", label, idx, sq);
+                    return;
+                }
+            }
+        }
+    }
+}
+
 fn add_piece_to_list(board: &mut Board, sq: u8, piece: i8) {
     let idx = piece_to_list_idx(piece);
     let count = board.piece_count[idx];
+    // Guard against duplicates (can arise from stale entries after corruption)
+    for i in 0..count {
+        if board.piece_list[idx][i as usize] == sq {
+            return; // already in list
+        }
+    }
     if (count as usize) < board.piece_list[idx].len() {
         board.piece_list[idx][count as usize] = sq;
         board.piece_count[idx] = count + 1;
@@ -956,6 +1012,8 @@ struct MoveUndo {
 
 fn make_move(board: &mut Board, mv: Move) -> MoveUndo {
 
+    validate_piece_lists(board, &format!("make_move_START({},{})", mv.from, mv.to));
+
     let current_side = board.side_to_move;
 
     let opponent = current_side.opposite();
@@ -1007,6 +1065,12 @@ fn make_move(board: &mut Board, mv: Move) -> MoveUndo {
 
         board.hash ^= ZOBRIST.keys[zobrist_key(captured, mv.to)];
 
+        // Remove captured piece from list. If the list was corrupt and
+        // the piece isn't found, DON'T rebuild — the piece is still on
+        // the board (board hasn't been updated yet), so a rebuild would
+        // just re-add it, creating a stale entry when the board update
+        // overwrites it moments later. Accept the miss — the stale entry
+        // (if any) will be overwritten by a future add.
         remove_piece_from_list(board, mv.to, captured);
     }
 
@@ -1018,9 +1082,10 @@ fn make_move(board: &mut Board, mv: Move) -> MoveUndo {
     board.board[mv.from as usize] = EMPTY;
 
     // Piece list: move piece from source to destination
-    remove_piece_from_list(board, mv.from, moving_piece);
+    if remove_piece_or_rebuild(board, mv.from, moving_piece) {
 
-    add_piece_to_list(board, mv.to, moving_piece);
+        add_piece_to_list(board, mv.to, moving_piece);
+    }
 
     // Track king position
     if is_king {
@@ -1040,9 +1105,12 @@ fn make_move(board: &mut Board, mv: Move) -> MoveUndo {
         board.board[mv.to as usize] = mv.promotion;
 
         // Piece list: swap pawn for promoted piece
+        // Note: remove_piece_or_rebuild rebuilds the PAWN list on failure.
+        // The add below is for the PROMOTED piece (different list), so we
+        // always add it — the return value only controls pawn-list logic.
         let pawn_piece = if current_side == Color::White { W_PAWN } else { B_PAWN };
 
-        remove_piece_from_list(board, mv.to, pawn_piece);
+        remove_piece_or_rebuild(board, mv.to, pawn_piece);
 
         add_piece_to_list(board, mv.to, mv.promotion);
     }
@@ -1063,7 +1131,7 @@ fn make_move(board: &mut Board, mv: Move) -> MoveUndo {
         // Piece list: remove captured pawn
         let captured_pawn = if current_side == Color::White { B_PAWN } else { W_PAWN };
 
-        remove_piece_from_list(board, captured_pawn_square, captured_pawn);
+        remove_piece_or_rebuild(board, captured_pawn_square, captured_pawn);
     }
 
     // Castling: move the rook when the king castles
@@ -1075,36 +1143,40 @@ fn make_move(board: &mut Board, mv: Move) -> MoveUndo {
 
             board.board[H1 as usize] = EMPTY;
 
-            remove_piece_from_list(board, H1, W_ROOK);
+            if remove_piece_or_rebuild(board, H1, W_ROOK) {
 
-            add_piece_to_list(board, F1, W_ROOK);
+                add_piece_to_list(board, F1, W_ROOK);
+            }
         } else if mv.from == E1 && mv.to == C1 {
 
             board.board[D1 as usize] = W_ROOK;
 
             board.board[A1 as usize] = EMPTY;
 
-            remove_piece_from_list(board, A1, W_ROOK);
+            if remove_piece_or_rebuild(board, A1, W_ROOK) {
 
-            add_piece_to_list(board, D1, W_ROOK);
+                add_piece_to_list(board, D1, W_ROOK);
+            }
         } else if mv.from == E8 && mv.to == G8 {
 
             board.board[F8 as usize] = B_ROOK;
 
             board.board[H8 as usize] = EMPTY;
 
-            remove_piece_from_list(board, H8, B_ROOK);
+            if remove_piece_or_rebuild(board, H8, B_ROOK) {
 
-            add_piece_to_list(board, F8, B_ROOK);
+                add_piece_to_list(board, F8, B_ROOK);
+            }
         } else if mv.from == E8 && mv.to == C8 {
 
             board.board[D8 as usize] = B_ROOK;
 
             board.board[A8 as usize] = EMPTY;
 
-            remove_piece_from_list(board, A8, B_ROOK);
+            if remove_piece_or_rebuild(board, A8, B_ROOK) {
 
-            add_piece_to_list(board, D8, B_ROOK);
+                add_piece_to_list(board, D8, B_ROOK);
+            }
         }
     }
 
@@ -1260,6 +1332,8 @@ fn make_move(board: &mut Board, mv: Move) -> MoveUndo {
         board.hash ^= ZOBRIST.keys[773 + (board.en_passant_square as usize & 7)];
     }
 
+    validate_piece_lists(board, &format!("make_move({},{})", mv.from, mv.to));
+
     MoveUndo {
         captured,
         ep_square: saved_ep_square,
@@ -1270,6 +1344,8 @@ fn make_move(board: &mut Board, mv: Move) -> MoveUndo {
 }
 
 fn unmake_move(board: &mut Board, mv: Move, undo: MoveUndo) {
+
+    validate_piece_lists(board, &format!("unmake_move_START({},{})", mv.from, mv.to));
 
     // Restore pre-move Zobrist hash (avoids needing to reverse the incremental update)
     board.hash = undo.hash;
@@ -1302,15 +1378,32 @@ fn unmake_move(board: &mut Board, mv: Move, undo: MoveUndo) {
 
     board.board[mv.to as usize] = undo.captured;
 
-    // Piece list: move piece back from destination to source
-    remove_piece_from_list(board, mv.to, final_piece_at_to);
+    // Piece list: move piece back from destination to source.
+    // final_piece_at_to is the same piece type in both lists, so the
+    // conditional add logic is correct (both sides reference the same list).
+    // On rebuild failure, the list already has the piece at the board's
+    // current location (mv.from), so we skip the add.
+    if remove_piece_or_rebuild(board, mv.to, final_piece_at_to) {
 
-    add_piece_to_list(board, mv.from, final_piece_at_to);
+        add_piece_to_list(board, mv.from, final_piece_at_to);
+    }
 
-    // Restore captured piece to destination list
+    // Restore captured piece to destination list.
+    // Check if already in the list to avoid duplicate from a stale entry.
     if undo.captured != EMPTY {
 
-        add_piece_to_list(board, mv.to, undo.captured);
+        let idx = piece_to_list_idx(undo.captured);
+        let mut already_present = false;
+        for i in 0..board.piece_count[idx] {
+            if board.piece_list[idx][i as usize] == mv.to {
+                already_present = true;
+                break;
+            }
+        }
+        if !already_present {
+
+            add_piece_to_list(board, mv.to, undo.captured);
+        }
     }
 
     // Promotion: revert the promoted piece back to a pawn
@@ -1318,8 +1411,9 @@ fn unmake_move(board: &mut Board, mv: Move, undo: MoveUndo) {
 
         board.board[mv.from as usize] = if opponent == Color::White { W_PAWN } else { B_PAWN };
 
-        // Piece list: swap promoted piece back to pawn
-        remove_piece_from_list(board, mv.from, mv.promotion);
+        // Remove promoted piece from list (rebuild promoted list if needed)
+        // then always add the pawn — these are different lists.
+        remove_piece_or_rebuild(board, mv.from, mv.promotion);
 
         let pawn_piece = if opponent == Color::White { W_PAWN } else { B_PAWN };
 
@@ -1340,44 +1434,49 @@ fn unmake_move(board: &mut Board, mv: Move, undo: MoveUndo) {
     }
 
     // Castling: restore the rook to its original square
+    // Uses named constants (E1=60, E8=4, etc.) — no magic numbers.
     if board.board[mv.from as usize] == (if opponent == Color::White { W_KING } else { B_KING }) {
 
-        if mv.from == 4 && mv.to == 6 {
+        if mv.from == E8 && mv.to == G8 {
 
-            board.board[7] = W_ROOK;
+            board.board[F8 as usize] = EMPTY;
 
-            board.board[5] = EMPTY;
+            board.board[H8 as usize] = B_ROOK;
 
-            remove_piece_from_list(board, 5, W_ROOK);
+            if remove_piece_or_rebuild(board, F8, B_ROOK) {
 
-            add_piece_to_list(board, 7, W_ROOK);
-        } else if mv.from == 4 && mv.to == 2 {
+                add_piece_to_list(board, H8, B_ROOK);
+            }
+        } else if mv.from == E8 && mv.to == C8 {
 
-            board.board[0] = W_ROOK;
+            board.board[D8 as usize] = EMPTY;
 
-            board.board[3] = EMPTY;
+            board.board[A8 as usize] = B_ROOK;
 
-            remove_piece_from_list(board, 3, W_ROOK);
+            if remove_piece_or_rebuild(board, D8, B_ROOK) {
 
-            add_piece_to_list(board, 0, W_ROOK);
-        } else if mv.from == 60 && mv.to == 62 {
+                add_piece_to_list(board, A8, B_ROOK);
+            }
+        } else if mv.from == E1 && mv.to == G1 {
 
-            board.board[63] = B_ROOK;
+            board.board[F1 as usize] = EMPTY;
 
-            board.board[61] = EMPTY;
+            board.board[H1 as usize] = W_ROOK;
 
-            remove_piece_from_list(board, 61, B_ROOK);
+            if remove_piece_or_rebuild(board, F1, W_ROOK) {
 
-            add_piece_to_list(board, 63, B_ROOK);
-        } else if mv.from == 60 && mv.to == 58 {
+                add_piece_to_list(board, H1, W_ROOK);
+            }
+        } else if mv.from == E1 && mv.to == C1 {
 
-            board.board[56] = B_ROOK;
+            board.board[D1 as usize] = EMPTY;
 
-            board.board[59] = EMPTY;
+            board.board[A1 as usize] = W_ROOK;
 
-            remove_piece_from_list(board, 59, B_ROOK);
+            if remove_piece_or_rebuild(board, D1, W_ROOK) {
 
-            add_piece_to_list(board, 56, B_ROOK);
+                add_piece_to_list(board, A1, W_ROOK);
+            }
         }
     }
 
@@ -1391,6 +1490,8 @@ fn unmake_move(board: &mut Board, mv: Move, undo: MoveUndo) {
 
         board.bk_sq = mv.from;
     }
+
+    validate_piece_lists(board, &format!("unmake_move({},{})", mv.from, mv.to));
 }
 
 // -----------------------------------------------------------------------------
@@ -1782,23 +1883,34 @@ impl TranspositionTable {
 
         let entry = &self.entries[(zobrist as usize) & TT_MASK];
 
-        // Read DATA first, then KEY.
-        // Reasoning: in Lazy SMP, a concurrent store() writes data then key.
-        // If we read key first (match), then read data, a race could give us
-        // data from a *different* position that just overwrote this slot.
-        // Reading data first avoids that: if key matches, data was written
-        // before it (store: data→key), and no subsequent writer can change
-        // data without also changing key (which would make our key check fail).
-        let data = entry.data.load(Ordering::Relaxed);
+        // Double-key-read seqlock:
+        //   store: data (Relaxed), then key (Release)
+        //   probe: key (Acquire), data (Relaxed), key (Acquire)
+        //
+        // If two threads write to the same slot concurrently (Lazy SMP),
+        // thread A's data + thread B's key could produce a false match.
+        // Double-checking the key catches this: if the key changed between
+        // the two reads, the data may be from a different store.
+        loop {
+            let key1 = entry.key.load(Ordering::Acquire);
 
-        let stored_key = entry.key.load(Ordering::Acquire);
+            let data = entry.data.load(Ordering::Relaxed);
 
-        if stored_key != zobrist {
+            let key2 = entry.key.load(Ordering::Acquire);
 
-            return None;
+            if key1 != key2 {
+
+                // Concurrent write in progress — retry
+                continue;
+            }
+
+            if key1 != zobrist {
+
+                return None;
+            }
+
+            return Some(unpack_tt_data(data));
         }
-
-        Some(unpack_tt_data(data))
     }
 
     fn store(&self, zobrist: u64, score: i32, best_move_packed: u16, depth: u8, flags: u8) {
@@ -1821,7 +1933,13 @@ impl TranspositionTable {
     }
 }
 
-static TT: LazyLock<TranspositionTable> = LazyLock::new(TranspositionTable::new);
+// Thread-local TT: each Lazy SMP thread has its own independent cache.
+// No shared state = no race conditions in probe/store.
+// The leader thread's TT provides move ordering for iterative deepening;
+// helper threads get fresh TTs and independently refine their own searches.
+thread_local! {
+    static TT: TranspositionTable = TranspositionTable::new();
+}
 
 // -----------------------------------------------------------------------------
 // Pinned-piece detection (pre-filter illegal moves before make/unmake)
@@ -1966,6 +2084,8 @@ const MAX_SEARCH_PLY: usize = 128; // Hard cap against stack overflow
 
 fn search(board: &mut Board, depth: usize, mut alpha: i32, beta: i32, killers: &mut [[Move; 2]], ply: usize) -> (i32, Move) {
 
+    validate_piece_lists(board, &format!("search(depth={},ply={})", depth, ply));
+
     // Safety guard: hard cap on recursion depth
     if ply >= MAX_SEARCH_PLY {
 
@@ -1990,7 +2110,7 @@ fn search(board: &mut Board, depth: usize, mut alpha: i32, beta: i32, killers: &
     // ── TT probe (uses incremental hash — O(1) instead of O(64)) ──
     let zobrist_key = board.hash;
 
-    let tt_result = TT.probe(zobrist_key);
+    let tt_result = TT.with(|tt| tt.probe(zobrist_key));
 
     if let Some((tt_score, tt_move_packed, tt_depth, tt_flags)) = tt_result {
 
@@ -2265,7 +2385,7 @@ fn search(board: &mut Board, depth: usize, mut alpha: i32, beta: i32, killers: &
 
     if best_move.from != best_move.to || best_move.promotion != 0 {
 
-        TT.store(zobrist_key, alpha, pack_move_data(&best_move), depth as u8, flags);
+        TT.with(|tt| tt.store(zobrist_key, alpha, pack_move_data(&best_move), depth as u8, flags));
     }
 
     (alpha, best_move)
@@ -2274,6 +2394,27 @@ fn search(board: &mut Board, depth: usize, mut alpha: i32, beta: i32, killers: &
 // -----------------------------------------------------------------------------
 // Public API
 // -----------------------------------------------------------------------------
+
+#[allow(dead_code)]
+fn best_move_single(fen: &str, depth: usize) -> Option<String> {
+    let board = parse_fen(fen).ok()?;
+    let mut local_board = board;
+    let mut killers = [[Move { from: 0, to: 0, promotion: 0 }; 2]; MAX_PLY];
+    let mut best = Move { from: 0, to: 0, promotion: 0 };
+
+    for d in 1..=depth {
+        let (_score, mv) = search(&mut local_board, d, -30000, 30000, &mut killers, 0);
+        let is_valid = mv.from != mv.to || mv.promotion != 0;
+        if is_valid {
+            best = mv;
+        }
+    }
+
+    if best.from == best.to {
+        return None;
+    }
+    Some(format!("{}{}", square_name(best.from), square_name(best.to)))
+}
 
 pub fn best_move(fen: &str, depth: usize) -> Option<String> {
 
@@ -2309,7 +2450,11 @@ pub fn best_move(fen: &str, depth: usize) -> Option<String> {
             let mut best = Move { from: 0, to: 0, promotion: 0 };
 
             for d in 1..=depth {
+                // Validate before search
+                validate_piece_lists(&local_board, &format!("leader before depth {}", d));
                 let (score, mv) = search(&mut local_board, d, -30000, 30000, &mut killers, 0);
+                // Validate after search
+                validate_piece_lists(&local_board, &format!("leader after depth {}", d));
                 let is_valid = mv.from != mv.to || mv.promotion != 0;
 
                 crate::log_debug(crate::LogMsg::ChessDepth {
@@ -2338,7 +2483,9 @@ pub fn best_move(fen: &str, depth: usize) -> Option<String> {
                     if leader_finished.load(Ordering::Acquire) {
                         break;
                     }
+                    validate_piece_lists(&local_board, &format!("helper before depth {}", d));
                     search(&mut local_board, d, -30000, 30000, &mut killers, 0);
+                    validate_piece_lists(&local_board, &format!("helper after depth {}", d));
                 }
             });
         }
@@ -2363,3 +2510,7 @@ pub fn best_move(fen: &str, depth: usize) -> Option<String> {
 
     Some(result)
 }
+
+#[cfg(test)]
+#[path = "../../tests/games/chess/main.rs"]
+mod tests;

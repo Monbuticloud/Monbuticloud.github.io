@@ -127,7 +127,12 @@ impl std::fmt::Display for LogMsg {
             },
             LogMsg::ChessNoMove => write!(f, "[chess]  => None (no valid move found across all depths)"),
             LogMsg::ChessResult { best_move } => write!(f, "[chess]  => {best_move}"),
-            LogMsg::ResourceUsage { rss_kb, vm_kb, threads, cpu_secs } => {
+            LogMsg::ResourceUsage {
+                rss_kb,
+                vm_kb,
+                threads,
+                cpu_secs,
+            } => {
                 write!(f, "[res] RSS={rss_kb}kB VM={vm_kb}kB threads={threads} CPU={cpu_secs:.1}s")
             },
         }
@@ -262,10 +267,12 @@ fn main() {
     });
 
     // ── Resource monitor: sample RSS / VM / threads / CPU every 10s ──
-    std::thread::spawn(|| loop {
-        std::thread::sleep(Duration::from_secs(10));
-        if let Some(msg) = sample_resources() {
-            log_debug(msg);
+    std::thread::spawn(|| {
+        loop {
+            std::thread::sleep(Duration::from_secs(10));
+            if let Some(msg) = sample_resources() {
+                log_debug(msg);
+            }
         }
     });
 
@@ -405,7 +412,7 @@ async fn get_chess_completion(params: Query<HashMap<String, String>>) -> Respons
 
     let depth = match params.get("depth") {
         Some(v) => match v.parse::<usize>() {
-            Ok(d) if (1..=12).contains(&d) => d,
+            Ok(d) if (1..=15).contains(&d) => d,
             _ => return json_body(StatusCode::BAD_REQUEST, r#"{"error":"'depth' must be 1–12"}"#.into()),
         },
         None => 5,

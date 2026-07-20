@@ -162,8 +162,8 @@ fn validate_piece_lists(board: &Board, label: &str) {
         let count = board.piece_count[idx];
         let piece_type = (idx % 6) + 1;
         let expected_piece = if idx < 6 { piece_type as i8 } else { -(piece_type as i8) };
-        for i in 0..count {
-            let sq = board.piece_list[idx][i as usize];
+        for entry_idx in 0..count {
+            let sq = board.piece_list[idx][entry_idx as usize];
             if sq >= 64 { continue; }
             let actual = board.board[sq as usize];
             if actual != expected_piece {
@@ -171,7 +171,7 @@ fn validate_piece_lists(board: &Board, label: &str) {
                 return;
             }
             // Check for duplicates
-            for j in 0..i {
+            for j in 0..entry_idx {
                 if board.piece_list[idx][j as usize] == sq {
                     debug_assert!(false, "DUPLICATE {} list[{}] sq={}", label, idx, sq);
                     return;
@@ -196,8 +196,8 @@ macro_rules! validate_piece_lists {
 fn add_piece_to_list(board: &mut Board, sq: u8, piece: i8) {
     let idx = piece_to_list_idx(piece);
     let count = board.piece_count[idx];
-    for i in 0..count {
-        if board.piece_list[idx][i as usize] == sq {
+    for entry_idx in 0..count {
+        if board.piece_list[idx][entry_idx as usize] == sq {
             debug_assert!(false,
                 "duplicate sq={} in list[{}] count={}", sq, idx, count);
             return;
@@ -531,9 +531,9 @@ fn generate_pseudo_legal_moves(board: &Board) -> MoveList {
 
         let count = board.piece_count[list_idx];
 
-        for i in 0..count {
+        for entry_idx in 0..count {
 
-            let square = board.piece_list[list_idx][i as usize];
+            let square = board.piece_list[list_idx][entry_idx as usize];
 
             let piece_type = type_offset + 1;
 
@@ -1381,8 +1381,8 @@ fn unmake_move(board: &mut Board, mv: Move, undo: MoveUndo) {
 
         let idx = piece_to_list_idx(undo.captured);
         let mut already_present = false;
-        for i in 0..board.piece_count[idx] {
-            if board.piece_list[idx][i as usize] == mv.to {
+        for entry_idx in 0..board.piece_count[idx] {
+            if board.piece_list[idx][entry_idx as usize] == mv.to {
                 already_present = true;
                 break;
             }
@@ -1481,8 +1481,8 @@ fn evaluate_board(board: &Board) -> i32 {
         let piece = (type_idx + 1) as i8;
         let count = board.piece_count[type_idx];
         let list = &board.piece_list[type_idx];
-        for i in 0..count {
-            let sq = list[i as usize];
+        for entry_idx in 0..count {
+            let sq = list[entry_idx as usize];
             score += piece_value(piece) + PST[sq as usize];
         }
     }
@@ -1492,8 +1492,8 @@ fn evaluate_board(board: &Board) -> i32 {
         let piece = -((type_idx - 5) as i8);
         let count = board.piece_count[type_idx];
         let list = &board.piece_list[type_idx];
-        for i in 0..count {
-            let sq = list[i as usize];
+        for entry_idx in 0..count {
+            let sq = list[entry_idx as usize];
             // Black PST is mirrored horizontally
             score -= piece_value(piece) + PST[(63 - sq) as usize];
         }

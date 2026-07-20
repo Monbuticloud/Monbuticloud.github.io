@@ -155,8 +155,8 @@ fn remove_piece_or_rebuild(board: &mut Board, sq: u8, piece: i8) -> bool {
 }
 
 // Debug: validate all piece lists against the board.
-// In debug builds, panics on first mismatch with full diagnostic.
-// In release builds, logs mismatches to stderr for investigation.
+// Called via validate_piece_lists!() macro — compiles out in release.
+#[cfg(debug_assertions)]
 fn validate_piece_lists(board: &Board, label: &str) {
     for idx in 0..12 {
         let count = board.piece_count[idx];
@@ -179,6 +179,18 @@ fn validate_piece_lists(board: &Board, label: &str) {
             }
         }
     }
+}
+
+/// Call-site macro: evaluates format args only in debug builds.
+#[cfg(debug_assertions)]
+macro_rules! validate_piece_lists {
+    ($board:expr, $($arg:tt)+) => {
+        validate_piece_lists($board, &format!($($arg)+));
+    };
+}
+#[cfg(not(debug_assertions))]
+macro_rules! validate_piece_lists {
+    ($board:expr, $($arg:tt)+) => {};
 }
 
 fn add_piece_to_list(board: &mut Board, sq: u8, piece: i8) {
@@ -994,7 +1006,7 @@ struct MoveUndo {
 
 fn make_move(board: &mut Board, mv: Move) -> MoveUndo {
 
-    validate_piece_lists(board, &format!("make_move_START({},{})", mv.from, mv.to));
+    validate_piece_lists!(board, "make_move_START({},{})", mv.from, mv.to);
 
     let current_side = board.side_to_move;
 
@@ -1307,7 +1319,7 @@ fn make_move(board: &mut Board, mv: Move) -> MoveUndo {
         board.hash ^= ZOBRIST.keys[773 + (board.en_passant_square as usize & 7)];
     }
 
-    validate_piece_lists(board, &format!("make_move({},{})", mv.from, mv.to));
+    validate_piece_lists!(board, "make_move({},{})", mv.from, mv.to);
 
     MoveUndo {
         captured,
@@ -1320,7 +1332,7 @@ fn make_move(board: &mut Board, mv: Move) -> MoveUndo {
 
 fn unmake_move(board: &mut Board, mv: Move, undo: MoveUndo) {
 
-    validate_piece_lists(board, &format!("unmake_move_START({},{})", mv.from, mv.to));
+    validate_piece_lists!(board, "unmake_move_START({},{})", mv.from, mv.to);
 
     // Restore pre-move Zobrist hash (avoids needing to reverse the incremental update)
     board.hash = undo.hash;
@@ -1454,7 +1466,7 @@ fn unmake_move(board: &mut Board, mv: Move, undo: MoveUndo) {
         _ => {},
     }
 
-    validate_piece_lists(board, &format!("unmake_move({},{})", mv.from, mv.to));
+    validate_piece_lists!(board, "unmake_move({},{})", mv.from, mv.to);
 }
 
 // -----------------------------------------------------------------------------
@@ -1464,41 +1476,32 @@ fn unmake_move(board: &mut Board, mv: Move, undo: MoveUndo) {
 use wide::i32x4;
 
 fn evaluate_board(board: &Board) -> i32 {
+    let mut score = 0i32;
 
-    let mut score = i32x4::ZERO;
-
-    // Process 4 squares per SIMD lane
-    for chunk in (0..64u8).step_by(4) {
-
-        let mut vals = [0i32; 4];
-
-        for (j, square) in (chunk..chunk + 4).enumerate() {
-
-            let piece = board.board[square as usize];
-
-            if piece != EMPTY {
-
-                let material = piece_value(piece);
-
-                let positional = if piece > 0 {
-
-                    PST[square as usize]
-                } else {
-
-                    PST[(63 - square) as usize]
-                };
-
-                let total = material + positional;
-
-                vals[j] = if piece > 0 { total } else { -total };
-            }
+    // White pieces: list indices 0..5 (W_PAWN..W_KING)
+    for type_idx in 0..6 {
+        let piece = (type_idx + 1) as i8;
+        let count = board.piece_count[type_idx];
+        let list = &board.piece_list[type_idx];
+        for i in 0..count {
+            let sq = list[i as usize];
+            score += piece_value(piece) + PST[sq as usize];
         }
-
-        score += i32x4::new(vals);
     }
 
-    // Horizontal sum of 4 SIMD lanes
-    score.reduce_add()
+    // Black pieces: list indices 6..11 (B_PAWN..B_KING)
+    for type_idx in 6..12 {
+        let piece = -((type_idx - 5) as i8);
+        let count = board.piece_count[type_idx];
+        let list = &board.piece_list[type_idx];
+        for i in 0..count {
+            let sq = list[i as usize];
+            // Black PST is mirrored horizontally
+            score -= piece_value(piece) + PST[(63 - sq) as usize];
+        }
+    }
+
+    score
 }
 
 // -----------------------------------------------------------------------------
@@ -2032,7 +2035,7 @@ const MAX_SEARCH_PLY: usize = 128; // Hard cap against stack overflow
 
 fn search(board: &mut Board, depth: usize, mut alpha: i32, beta: i32, killers: &mut [[Move; 2]], ply: usize) -> (i32, Move) {
 
-    validate_piece_lists(board, &format!("search(depth={},ply={})", depth, ply));
+    validate_piece_lists!(board, "search(depth={},ply={})", depth, ply);
 
     // Safety guard: hard cap on recursion depth
     if ply >= MAX_SEARCH_PLY {
@@ -2379,10 +2382,10 @@ pub fn best_move(fen: &str, depth: usize) -> Option<String> {
 
             for d in 1..=depth {
                 // Validate before search
-                validate_piece_lists(&local_board, &format!("leader before depth {}", d));
+                validate_piece_lists!(&local_board, "leader before depth {}", d);
                 let (score, mv) = search(&mut local_board, d, -30000, 30000, &mut killers, 0);
                 // Validate after search
-                validate_piece_lists(&local_board, &format!("leader after depth {}", d));
+                validate_piece_lists!(&local_board, "leader after depth {}", d);
                 let is_valid = mv.from != mv.to || mv.promotion != 0;
 
                 crate::log_debug(crate::LogMsg::ChessDepth {
@@ -2411,9 +2414,9 @@ pub fn best_move(fen: &str, depth: usize) -> Option<String> {
                     if leader_finished.load(Ordering::Acquire) {
                         break;
                     }
-                    validate_piece_lists(&local_board, &format!("helper before depth {}", d));
+                    validate_piece_lists!(&local_board, "helper before depth {}", d);
                     search(&mut local_board, d, -30000, 30000, &mut killers, 0);
-                    validate_piece_lists(&local_board, &format!("helper after depth {}", d));
+                    validate_piece_lists!(&local_board, "helper after depth {}", d);
                 }
             });
         }

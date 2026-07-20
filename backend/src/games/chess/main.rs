@@ -217,8 +217,11 @@ const CASTLING_BK: u8 = 4;
 const CASTLING_BQ: u8 = 8;
 
 // Named squares for castling (replace magic numbers throughout).
-// Square indexing: 0 = a8, 63 = h1 (FEN top-to-bottom).
-// e1 = rank 1 file 4 = (7×8)+4 = 60,  e8 = rank 8 file 4 = (0×8)+4 = 4.
+// Square indexing: 0 = a8 … 63 = h1 (FEN top-to-bottom).
+// Formula: square = rank × 8 + file, where rank 0 = 8th rank, rank 7 = 1st rank.
+//   White back rank (1st):  A1=56, B1=57, C1=58, D1=59, E1=60, F1=61, G1=62, H1=63
+//   Black back rank (8th):  A8=0,  B8=1,  C8=2,  D8=3,  E8=4,  F8=5,  G8=6,  H8=7
+// When adding a new square constant, verify with the formula above.
 const E1: u8 = 60;
 const G1: u8 = 62;
 const C1: u8 = 58;
@@ -235,8 +238,7 @@ const F8: u8 = 5;
 const H8: u8 = 7;
 const A8: u8 = 0;
 const D8: u8 = 3;
-
-const B8: u8 = 57;
+const B8: u8 = 1;
 
 // -----------------------------------------------------------------------------
 // Move representation

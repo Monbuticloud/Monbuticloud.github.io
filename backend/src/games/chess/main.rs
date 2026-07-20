@@ -1470,10 +1470,8 @@ fn unmake_move(board: &mut Board, mv: Move, undo: MoveUndo) {
 }
 
 // -----------------------------------------------------------------------------
-// Evaluation (SIMD via wide::i32x4 — 128-bit registers, 4 squares per op)
+// Evaluation (piece lists — no heap, no SIMD overhead)
 // -----------------------------------------------------------------------------
-
-use wide::i32x4;
 
 fn evaluate_board(board: &Board) -> i32 {
     let mut score = 0i32;

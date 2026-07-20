@@ -1647,9 +1647,9 @@ impl Zobrist {
 
         let mut keys = [0u64; 781];
 
-        for k in keys.iter_mut() {
+        for key in keys.iter_mut() {
 
-            *k = rng.next();
+            *key = rng.next();
         }
 
         Zobrist { keys }

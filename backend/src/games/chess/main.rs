@@ -1155,50 +1155,38 @@ fn make_move(board: &mut Board, mv: Move) -> MoveUndo {
 
         remove_piece_or_rebuild(board, captured_pawn_square, captured_pawn);
     }
-
     // Castling: move the rook when the king castles
     if is_king {
-
-        if mv.from == E1 && mv.to == G1 {
-
-            board.board[F1 as usize] = W_ROOK;
-
-            board.board[H1 as usize] = EMPTY;
-
-            if remove_piece_or_rebuild(board, H1, W_ROOK) {
-
-                add_piece_to_list(board, F1, W_ROOK);
-            }
-        } else if mv.from == E1 && mv.to == C1 {
-
-            board.board[D1 as usize] = W_ROOK;
-
-            board.board[A1 as usize] = EMPTY;
-
-            if remove_piece_or_rebuild(board, A1, W_ROOK) {
-
-                add_piece_to_list(board, D1, W_ROOK);
-            }
-        } else if mv.from == E8 && mv.to == G8 {
-
-            board.board[F8 as usize] = B_ROOK;
-
-            board.board[H8 as usize] = EMPTY;
-
-            if remove_piece_or_rebuild(board, H8, B_ROOK) {
-
-                add_piece_to_list(board, F8, B_ROOK);
-            }
-        } else if mv.from == E8 && mv.to == C8 {
-
-            board.board[D8 as usize] = B_ROOK;
-
-            board.board[A8 as usize] = EMPTY;
-
-            if remove_piece_or_rebuild(board, A8, B_ROOK) {
-
-                add_piece_to_list(board, D8, B_ROOK);
-            }
+        match (mv.from, mv.to) {
+            (E1, G1) => {
+                board.board[F1 as usize] = W_ROOK;
+                board.board[H1 as usize] = EMPTY;
+                if remove_piece_or_rebuild(board, H1, W_ROOK) {
+                    add_piece_to_list(board, F1, W_ROOK);
+                }
+            },
+            (E1, C1) => {
+                board.board[D1 as usize] = W_ROOK;
+                board.board[A1 as usize] = EMPTY;
+                if remove_piece_or_rebuild(board, A1, W_ROOK) {
+                    add_piece_to_list(board, D1, W_ROOK);
+                }
+            },
+            (E8, G8) => {
+                board.board[F8 as usize] = B_ROOK;
+                board.board[H8 as usize] = EMPTY;
+                if remove_piece_or_rebuild(board, H8, B_ROOK) {
+                    add_piece_to_list(board, F8, B_ROOK);
+                }
+            },
+            (E8, C8) => {
+                board.board[D8 as usize] = B_ROOK;
+                board.board[A8 as usize] = EMPTY;
+                if remove_piece_or_rebuild(board, A8, B_ROOK) {
+                    add_piece_to_list(board, D8, B_ROOK);
+                }
+            },
+            _ => {},
         }
     }
 
@@ -1460,50 +1448,38 @@ fn unmake_move(board: &mut Board, mv: Move, undo: MoveUndo) {
     // Castling: restore the rook to its original square
     // Uses named constants (E1=60, E8=4, etc.) — no magic numbers.
     if board.board[mv.from as usize] == (if opponent == Color::White { W_KING } else { B_KING }) {
-
-        if mv.from == E8 && mv.to == G8 {
-
-            board.board[F8 as usize] = EMPTY;
-
-            board.board[H8 as usize] = B_ROOK;
-
-            if remove_piece_or_rebuild(board, F8, B_ROOK) {
-
-                add_piece_to_list(board, H8, B_ROOK);
-            }
-        } else if mv.from == E8 && mv.to == C8 {
-
-            board.board[D8 as usize] = EMPTY;
-
-            board.board[A8 as usize] = B_ROOK;
-
-            if remove_piece_or_rebuild(board, D8, B_ROOK) {
-
-                add_piece_to_list(board, A8, B_ROOK);
-            }
-        } else if mv.from == E1 && mv.to == G1 {
-
-            board.board[F1 as usize] = EMPTY;
-
-            board.board[H1 as usize] = W_ROOK;
-
-            if remove_piece_or_rebuild(board, F1, W_ROOK) {
-
-                add_piece_to_list(board, H1, W_ROOK);
-            }
-        } else if mv.from == E1 && mv.to == C1 {
-
-            board.board[D1 as usize] = EMPTY;
-
-            board.board[A1 as usize] = W_ROOK;
-
-            if remove_piece_or_rebuild(board, D1, W_ROOK) {
-
-                add_piece_to_list(board, A1, W_ROOK);
-            }
+        match (mv.from, mv.to) {
+            (E8, G8) => {
+                board.board[F8 as usize] = EMPTY;
+                board.board[H8 as usize] = B_ROOK;
+                if remove_piece_or_rebuild(board, F8, B_ROOK) {
+                    add_piece_to_list(board, H8, B_ROOK);
+                }
+            },
+            (E8, C8) => {
+                board.board[D8 as usize] = EMPTY;
+                board.board[A8 as usize] = B_ROOK;
+                if remove_piece_or_rebuild(board, D8, B_ROOK) {
+                    add_piece_to_list(board, A8, B_ROOK);
+                }
+            },
+            (E1, G1) => {
+                board.board[F1 as usize] = EMPTY;
+                board.board[H1 as usize] = W_ROOK;
+                if remove_piece_or_rebuild(board, F1, W_ROOK) {
+                    add_piece_to_list(board, H1, W_ROOK);
+                }
+            },
+            (E1, C1) => {
+                board.board[D1 as usize] = EMPTY;
+                board.board[A1 as usize] = W_ROOK;
+                if remove_piece_or_rebuild(board, D1, W_ROOK) {
+                    add_piece_to_list(board, A1, W_ROOK);
+                }
+            },
+            _ => {},
         }
     }
-
     // Restore king square if the moved piece was a king
     let restored_piece = board.board[mv.from as usize];
 

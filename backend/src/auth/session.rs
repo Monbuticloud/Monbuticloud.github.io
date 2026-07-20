@@ -51,14 +51,14 @@ pub fn build_session_token(key_id: &str, nonce_counter: i64, expiry: i64) -> Str
     mac.update(&salt);
     mac.update(&nonce_counter.to_be_bytes());
     mac.update(&expiry.to_be_bytes());
-    let h = hex::encode(mac.finalize().into_bytes());
+    let hmac_hex = hex::encode(mac.finalize().into_bytes());
 
     format!(
         "{}.{}.{}.{}",
         hex::encode(key_id.as_bytes()),
         hex::encode(salt),
         hex::encode(expiry.to_be_bytes()),
-        h,
+        hmac_hex,
     )
 }
 

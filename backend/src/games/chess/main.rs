@@ -100,25 +100,21 @@ fn piece_to_list_idx(piece: i8) -> usize {
 /// Returns false if not found (list was corrupt — use rebuild instead).
 fn remove_piece_from_list(board: &mut Board, sq: u8, piece: i8) -> bool {
     let idx = piece_to_list_idx(piece);
-    let count = board.piece_count[idx];
+    let original_count = board.piece_count[idx];
     let mut removed = false;
     let mut i = 0;
     while (i as u8) < board.piece_count[idx] {
-        let n = board.piece_count[idx];
+        let current_count = board.piece_count[idx];
         if board.piece_list[idx][i as usize] == sq {
-            let last = n - 1;
+            let last = current_count - 1;
             board.piece_list[idx][i as usize] = board.piece_list[idx][last as usize];
             board.piece_count[idx] = last;
             removed = true;
-            // Don't increment i — the element swapped in from `last`
-            // might also equal `sq` (stale duplicate). Keep checking.
         } else {
             i += 1;
         }
     }
-    // If we removed more than one copy, the list had stale duplicates.
-    // Rebuild from the board to get a definitive clean state.
-    let removed_count = (count as usize) - (board.piece_count[idx] as usize);
+    let removed_count = (original_count as usize) - (board.piece_count[idx] as usize);
     if removed_count > 1 {
         rebuild_piece_list(board, piece);
     }
@@ -1490,7 +1486,7 @@ fn evaluate_board(board: &Board) -> i32 {
 
                 let material = piece_value(piece);
 
-                let pst = if piece > 0 {
+                let positional = if piece > 0 {
 
                     PST[square as usize]
                 } else {
@@ -1498,7 +1494,7 @@ fn evaluate_board(board: &Board) -> i32 {
                     PST[(63 - square) as usize]
                 };
 
-                let total = material + pst;
+                let total = material + positional;
 
                 vals[j] = if piece > 0 { total } else { -total };
             }
@@ -1641,9 +1637,9 @@ fn zobrist_key(piece: i8, sq: Square) -> usize {
     if piece == EMPTY {
         return 0;
     }
-    let pt = piece.unsigned_abs() as usize - 1; // 0..5
+    let piece_type = piece.unsigned_abs() as usize - 1; // 0..5
     let color = if piece > 0 { 0 } else { 1 }; // 0=White, 1=Black
-    (pt * 2 + color) * 64 + sq as usize
+    (piece_type * 2 + color) * 64 + sq as usize
 }
 
 struct Zobrist {
@@ -1667,7 +1663,7 @@ impl Zobrist {
 
     fn hash(&self, board: &Board) -> u64 {
 
-        let mut h = 0u64;
+        let mut hash = 0u64;
 
         for sq in 0..64u8 {
 
@@ -1675,17 +1671,17 @@ impl Zobrist {
 
             if piece != EMPTY {
 
-                let pt = piece.unsigned_abs() as usize - 1; // 0..5
+                let piece_type = piece.unsigned_abs() as usize - 1; // 0..5
 
                 let color = if piece > 0 { 0usize } else { 1usize };
 
-                h ^= self.keys[(pt * 2 + color) * 64 + sq as usize];
+                hash ^= self.keys[(piece_type * 2 + color) * 64 + sq as usize];
             }
         }
 
         if board.side_to_move == Color::Black {
 
-            h ^= self.keys[768];
+            hash ^= self.keys[768];
         }
 
         const CASTLING_BITS: [(u8, usize); 4] = [
@@ -1699,7 +1695,7 @@ impl Zobrist {
 
             if board.castling_rights & bit != 0 {
 
-                h ^= self.keys[idx];
+                hash ^= self.keys[idx];
             }
         }
 
@@ -1707,10 +1703,10 @@ impl Zobrist {
 
             let file = (board.en_passant_square as usize) & 7;
 
-            h ^= self.keys[773 + file];
+            hash ^= self.keys[773 + file];
         }
 
-        h
+        hash
     }
 }
 
@@ -1978,11 +1974,11 @@ fn compute_pins(board: &Board) -> PinnedInfo {
                     }
                 } else {
                     // Enemy piece — does it attack along this direction?
-                    let pt = piece.abs();
+                    let piece_type = piece.abs();
 
                     let attacks_along = match dir {
-                        -9 | -7 | 7 | 9 => pt == 3 || pt == 5, // bishop or queen
-                        -8 | 1 | -1 | 8 => pt == 4 || pt == 5, // rook or queen
+                        -9 | -7 | 7 | 9 => piece_type == 3 || piece_type == 5, // bishop or queen
+                        -8 | 1 | -1 | 8 => piece_type == 4 || piece_type == 5, // rook or queen
                         _ => false,
                     };
 
@@ -2022,10 +2018,10 @@ fn pinned_dir(square: u8, info: &PinnedInfo) -> Option<i8> {
 
 /// A pinned piece can only move along (or against) its pin direction.
 fn move_stays_on_pin(mv: &Move, pin_dir: i8) -> bool {
-    let dx = (mv.to as i8 % 8) - (mv.from as i8 % 8);
-    let dy = (mv.to as i8 / 8) - (mv.from as i8 / 8);
-    if dx == 0 && dy == 0 { return true; }
-    let step = match (dx.signum(), dy.signum()) {
+    let file_delta = (mv.to as i8 % 8) - (mv.from as i8 % 8);
+    let rank_delta = (mv.to as i8 / 8) - (mv.from as i8 / 8);
+    if file_delta == 0 && rank_delta == 0 { return true; }
+    let step = match (file_delta.signum(), rank_delta.signum()) {
         (1, 1) => 9,
         (1, -1) => -7,
         (-1, 1) => 7,
@@ -2170,9 +2166,9 @@ fn search(board: &mut Board, depth: usize, mut alpha: i32, beta: i32, killers: &
     // MVV-LVA move ordering: score captures by (victim_value - attacker_value)
     let mut move_scores = [0i16; MAX_MOVES];
 
-    let k0 = killers[ply][0];
+    let primary_killer = killers[ply][0];
 
-    let k1 = killers[ply][1];
+    let secondary_killer = killers[ply][1];
 
     for i in 0..pseudo_moves.count {
 
@@ -2189,8 +2185,8 @@ fn search(board: &mut Board, depth: usize, mut alpha: i32, beta: i32, killers: &
 
             // Promotions score between minor (330) and major (500+)
             move_scores[i] = piece_value(mv.promotion) as i16 / 10;
-        } else if mv.from == k0.from && mv.to == k0.to && mv.promotion == k0.promotion
-            || mv.from == k1.from && mv.to == k1.to && mv.promotion == k1.promotion
+        } else if mv.from == primary_killer.from && mv.to == primary_killer.to && mv.promotion == primary_killer.promotion
+            || mv.from == secondary_killer.from && mv.to == secondary_killer.to && mv.promotion == secondary_killer.promotion
         {
 
             // Killer moves: quiet moves that caused cutoffs at this ply

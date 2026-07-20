@@ -101,15 +101,28 @@ fn piece_to_list_idx(piece: i8) -> usize {
 fn remove_piece_from_list(board: &mut Board, sq: u8, piece: i8) -> bool {
     let idx = piece_to_list_idx(piece);
     let count = board.piece_count[idx];
-    for i in 0..count {
+    let mut removed = false;
+    let mut i = 0;
+    while (i as u8) < board.piece_count[idx] {
+        let n = board.piece_count[idx];
         if board.piece_list[idx][i as usize] == sq {
-            let last = count - 1;
+            let last = n - 1;
             board.piece_list[idx][i as usize] = board.piece_list[idx][last as usize];
             board.piece_count[idx] = last;
-            return true;
+            removed = true;
+            // Don't increment i — the element swapped in from `last`
+            // might also equal `sq` (stale duplicate). Keep checking.
+        } else {
+            i += 1;
         }
     }
-    false // piece not found — list is corrupt
+    // If we removed more than one copy, the list had stale duplicates.
+    // Rebuild from the board to get a definitive clean state.
+    let removed_count = (count as usize) - (board.piece_count[idx] as usize);
+    if removed_count > 1 {
+        rebuild_piece_list(board, piece);
+    }
+    removed
 }
 
 /// Rebuild a piece list from the board (used as fallback when remove fails).
@@ -177,10 +190,8 @@ fn add_piece_to_list(board: &mut Board, sq: u8, piece: i8) {
     let count = board.piece_count[idx];
     for i in 0..count {
         if board.piece_list[idx][i as usize] == sq {
-            let bt = std::backtrace::Backtrace::force_capture();
             debug_assert!(false,
-                "duplicate sq={} in list[{}] count={} existing={:?}\nbacktrace:\n{}",
-                sq, idx, count, &board.piece_list[idx][..count as usize], bt);
+                "duplicate sq={} in list[{}] count={}", sq, idx, count);
             return;
         }
     }
@@ -1440,20 +1451,10 @@ fn unmake_move(board: &mut Board, mv: Move, undo: MoveUndo) {
 
         board.board[captured_pawn_square as usize] = captured_pawn;
 
-        // Piece list: restore captured pawn (check for duplicates
-        // to handle stale entries from previous list corruption).
-        let idx = piece_to_list_idx(captured_pawn);
-        let mut already_present = false;
-        for i in 0..board.piece_count[idx] {
-            if board.piece_list[idx][i as usize] == captured_pawn_square {
-                already_present = true;
-                break;
-            }
-        }
-        if !already_present {
-
-            add_piece_to_list(board, captured_pawn_square, captured_pawn);
-        }
+        // Rebuild the captured pawn's list from the board to clear any
+        // stale entries before adding — en passant is the most common
+        // trigger for latent duplicate bugs.
+        rebuild_piece_list(board, captured_pawn);
     }
 
     // Castling: restore the rook to its original square

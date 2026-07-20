@@ -1571,12 +1571,11 @@ fn quiesce(board: &mut Board, mut alpha: i32, beta: i32, ply: u8) -> i32 {
         }
 
         // SEE: skip obviously losing captures in quiescence
-        if !in_check_pos && board.board[mv.to as usize] != EMPTY && mv.promotion == 0 {
+        if !in_check_pos && board.board[mv.to as usize] != EMPTY && mv.promotion == 0
+            && !good_capture(board, &mv)
+        {
 
-            if !good_capture(board, &mv) {
-
-                continue;
-            }
+            continue;
         }
 
         let undo = make_move(board, mv);
@@ -1976,17 +1975,12 @@ fn compute_pins(board: &Board) -> PinnedInfo {
                         _ => false,
                     };
 
-                    if attacks_along {
-
-                        if let Some(pin_sq) = found_piece {
-
-                            info.pins[info.count] = Pin {
-                                square: pin_sq,
-                                direction: dir,
-                            };
-
-                            info.count += 1;
-                        }
+                    if attacks_along && let Some(pin_sq) = found_piece {
+                        info.pins[info.count] = Pin {
+                            square: pin_sq,
+                            direction: dir,
+                        };
+                        info.count += 1;
                     }
 
                     break;
@@ -2102,11 +2096,9 @@ fn search(board: &mut Board, depth: usize, mut alpha: i32, beta: i32, killers: &
                     }
                 },
                 // Upper bound (no improvement) → fail‑low if ≤ alpha
-                TT_UPPER => {
-                    if tt_score <= alpha {
+                TT_UPPER if tt_score <= alpha => {
 
-                        return (tt_score, tt_best);
-                    }
+                    return (tt_score, tt_best);
                 },
                 _ => {},
             }
@@ -2135,24 +2127,21 @@ fn search(board: &mut Board, depth: usize, mut alpha: i32, beta: i32, killers: &
     }
 
     // ── TT best‑move ordering: promote to position 0 ──
-    if let Some((_, tt_move_packed, _, _)) = tt_result {
+    if let Some((_, tt_move_packed, _, _)) = tt_result && tt_move_packed != 0 {
 
-        if tt_move_packed != 0 {
+        let (tt_from, tt_to, promo_code) = unpack_move_data(tt_move_packed);
 
-            let (tt_from, tt_to, promo_code) = unpack_move_data(tt_move_packed);
+        let tt_promo = decode_promotion(promo_code, board.side_to_move);
 
-            let tt_promo = decode_promotion(promo_code, board.side_to_move);
+        for i in 0..pseudo_moves.count {
 
-            for i in 0..pseudo_moves.count {
+            let mv = pseudo_moves.moves[i];
 
-                let mv = pseudo_moves.moves[i];
+            if mv.from == tt_from && mv.to == tt_to && mv.promotion == tt_promo {
 
-                if mv.from == tt_from && mv.to == tt_to && mv.promotion == tt_promo {
+                pseudo_moves.moves.swap(0, i);
 
-                    pseudo_moves.moves.swap(0, i);
-
-                    break;
-                }
+                break;
             }
         }
     }
@@ -2264,12 +2253,11 @@ fn search(board: &mut Board, depth: usize, mut alpha: i32, beta: i32, killers: &
         let is_quiet = board.board[mv.to as usize] == EMPTY && mv.promotion == 0;
 
         // Quick filter: skip moves that would expose the king (via pin)
-        if !in_check_pos {
-            if let Some(pin_dir) = pinned_dir(mv.from, &pin_info) {
-                if !move_stays_on_pin(&mv, pin_dir) {
-                    continue;
-                }
-            }
+        if !in_check_pos && let Some(pin_dir) = pinned_dir(mv.from, &pin_info)
+            && !move_stays_on_pin(&mv, pin_dir)
+        {
+
+            continue;
         }
 
         let undo = make_move(board, mv);

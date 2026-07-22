@@ -2,9 +2,10 @@
 // No heap allocations inside search/move generation.
 // Uses enums for clarity and constants for demystification.
 
+use portable_atomic::AtomicU128;
 use std::sync::{
     LazyLock,
-    atomic::{AtomicBool, AtomicU64, Ordering},
+    atomic::{AtomicBool, Ordering},
 };
 
 // -----------------------------------------------------------------------------
@@ -1786,21 +1787,23 @@ const TT_BITS: usize = 21; // 2^21 = 2 097 152 entries × 16 bytes ≈ 32 MB
 
 const TT_MASK: usize = (1 << TT_BITS) - 1;
 
-/// Single TT entry packed into two atomics:
+/// Single TT entry: key(64) ‖ data(64) packed into one atomic 128-bit slot.
 ///   key:   full 64‑bit Zobrist hash
 ///   data:  score(32) | best_move_packed(16) | depth(8) | flags(8)
-#[repr(C, align(8))]
+///   flags: 0=EXACT, 1=LOWER (beta cutoff), 2=UPPER (fail low)
+///
+/// One atomic load = no torn reads, no seqlock, no race possible.
+#[repr(C, align(16))]
 struct TTEntry {
-    key: AtomicU64,
-    data: AtomicU64,
+    packed: AtomicU128,
 }
 
 // flags
 const TT_EXACT: u8 = 0;
 
-const TT_LOWER: u8 = 1; // beta cutoff → score is a lower bound
+const TT_LOWER: u8 = 1;
 
-const TT_UPPER: u8 = 2; // no move improved alpha → score is an upper bound
+const TT_UPPER: u8 = 2;
 
 fn pack_tt_data(score: i32, best_move_packed: u16, depth: u8, flags: u8) -> u64 {
 
@@ -1820,6 +1823,14 @@ fn unpack_tt_data(data: u64) -> (i32, u16, u8, u8) {
     (score, best_move_packed, depth, flags)
 }
 
+fn pack_entry(key: u64, data: u64) -> u128 {
+    (key as u128) << 64 | data as u128
+}
+
+fn unpack_entry(packed: u128) -> (u64, u64) {
+    ((packed >> 64) as u64, packed as u64)
+}
+
 struct TranspositionTable {
     entries: Box<[TTEntry]>,
 }
@@ -1832,8 +1843,7 @@ impl TranspositionTable {
         let mut vec = Vec::with_capacity(count);
 
         vec.resize_with(count, || TTEntry {
-            key: AtomicU64::new(0),
-            data: AtomicU64::new(0),
+            packed: AtomicU128::new(0),
         });
 
         TranspositionTable {
@@ -1845,34 +1855,17 @@ impl TranspositionTable {
 
         let entry = &self.entries[(zobrist as usize) & TT_MASK];
 
-        // Double-key-read seqlock:
-        //   store: data (Relaxed), then key (Release)
-        //   probe: key (Acquire), data (Relaxed), key (Acquire)
-        //
-        // If two threads write to the same slot concurrently (Lazy SMP),
-        // thread A's data + thread B's key could produce a false match.
-        // Double-checking the key catches this: if the key changed between
-        // the two reads, the data may be from a different store.
-        loop {
-            let key1 = entry.key.load(Ordering::Acquire);
+        // Single atomic 128-bit load: key + data arrive together, no race.
+        let packed = entry.packed.load(Ordering::Acquire);
 
-            let data = entry.data.load(Ordering::Relaxed);
+        let (key, data) = unpack_entry(packed);
 
-            let key2 = entry.key.load(Ordering::Acquire);
+        if key != zobrist || data == 0 {
 
-            if key1 != key2 {
-
-                // Concurrent write in progress — retry
-                continue;
-            }
-
-            if key1 != zobrist {
-
-                return None;
-            }
-
-            return Some(unpack_tt_data(data));
+            return None;
         }
+
+        Some(unpack_tt_data(data))
     }
 
     fn store(&self, zobrist: u64, score: i32, best_move_packed: u16, depth: u8, flags: u8) {
@@ -1881,27 +1874,45 @@ impl TranspositionTable {
 
         let new_data = pack_tt_data(score, best_move_packed, depth, flags);
 
-        let old_data = entry.data.load(Ordering::Relaxed);
+        let new_packed = pack_entry(zobrist, new_data);
 
-        // Depth‑preferred replacement: deeper searches overwrite shallower ones
-        if old_data != 0 && unpack_tt_data(old_data).2 > depth {
+        // CAS loop for depth‑preferred replacement.
+        // Only one writer wins; losers retry with fresh data.
+        loop {
+            let old_packed = entry.packed.load(Ordering::Relaxed);
 
-            return;
+            let (_old_key, old_data) = unpack_entry(old_packed);
+
+            // Empty slot or deeper search → overwrite
+            if old_data != 0 && unpack_tt_data(old_data).2 > depth {
+
+                return;
+            }
+
+            if entry
+                .packed
+                .compare_exchange_weak(
+                    old_packed,
+                    new_packed,
+                    Ordering::Release,
+                    Ordering::Relaxed,
+                )
+                .is_ok()
+            {
+
+                return;
+            }
+            // CAS failed → someone else wrote the slot, retry
         }
-
-        entry.data.store(new_data, Ordering::Relaxed);
-
-        entry.key.store(zobrist, Ordering::Release);
     }
 }
 
-// Thread-local TT: each Lazy SMP thread has its own independent cache.
-// No shared state = no race conditions in probe/store.
-// The leader thread's TT provides move ordering for iterative deepening;
-// helper threads get fresh TTs and independently refine their own searches.
-thread_local! {
-    static TT: TranspositionTable = TranspositionTable::new();
-}
+// Global lock‑free TT shared across all Lazy SMP threads.
+// The seqlock in probe/store handles concurrent access:
+// helpers refine the same cache the leader reads, so move ordering
+// improves across all threads.  Single allocation at startup, zero
+// heap during search.
+static TT: LazyLock<TranspositionTable> = LazyLock::new(TranspositionTable::new);
 
 // -----------------------------------------------------------------------------
 // Pinned-piece detection (pre-filter illegal moves before make/unmake)
@@ -2059,7 +2070,7 @@ fn search(board: &mut Board, depth: usize, mut alpha: i32, beta: i32, killers: &
     // ── TT probe (uses incremental hash — O(1) instead of O(64)) ──
     let zobrist_key = board.hash;
 
-    let tt_result = TT.with(|tt| tt.probe(zobrist_key));
+    let tt_result = TT.probe(zobrist_key);
 
     if let Some((tt_score, tt_move_packed, tt_depth, tt_flags)) = tt_result {
 
@@ -2314,7 +2325,7 @@ fn search(board: &mut Board, depth: usize, mut alpha: i32, beta: i32, killers: &
 
     if best_move.from != best_move.to || best_move.promotion != 0 {
 
-        TT.with(|tt| tt.store(zobrist_key, alpha, pack_move_data(&best_move), depth as u8, flags));
+        TT.store(zobrist_key, alpha, pack_move_data(&best_move), depth as u8, flags);
     }
 
     (alpha, best_move)

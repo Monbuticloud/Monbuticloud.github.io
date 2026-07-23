@@ -30,6 +30,7 @@ RUN rm -rf src
 COPY src/ src/
 COPY static/*.html static/*.css static/*.js /static/
 COPY static/assets/ /static/assets/
+COPY src/games/chess/filtered.bin /static/filtered.bin
 
 # ── Minify static assets (builder stage only — zero impact on final image) ──
 RUN apk add --no-cache nodejs npm && \

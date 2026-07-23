@@ -3,6 +3,7 @@
 // Uses enums for clarity and constants for demystification.
 
 use portable_atomic::AtomicU128;
+use std::collections::HashMap;
 use std::sync::{
     LazyLock,
     atomic::{AtomicBool, Ordering},
@@ -1915,6 +1916,75 @@ impl TranspositionTable {
 static TT: LazyLock<TranspositionTable> = LazyLock::new(TranspositionTable::new);
 
 // -----------------------------------------------------------------------------
+// Opening book (PolyGlot format, OpenZL-compressed)
+// -----------------------------------------------------------------------------
+
+/// A single PolyGlot book entry (16 bytes → key+move+weight+learn).
+struct BookEntry {
+    packed_move: u16,
+    weight: u16,
+}
+
+/// Lightweight opening book: HashMap from Zobrist key to move list.
+/// ~188KB decompressed, ~12K entries — trivial memory.
+struct OpeningBook {
+    map: HashMap<u64, Vec<BookEntry>>,
+}
+
+impl OpeningBook {
+    fn load(path: &str) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
+        let data = std::fs::read(path)?;
+
+        let mut map: HashMap<u64, Vec<BookEntry>> =
+            HashMap::with_capacity(data.len() / 16);
+
+        for chunk in data.chunks_exact(16) {
+            let key = u64::from_le_bytes(chunk[0..8].try_into()?);
+            let packed_move = u16::from_le_bytes(chunk[8..10].try_into()?);
+            let weight = u16::from_le_bytes(chunk[10..12].try_into()?);
+            // bytes 12–15: learn (u32, ignored)
+
+            map.entry(key).or_default().push(BookEntry { packed_move, weight });
+        }
+
+        Ok(OpeningBook { map })
+    }
+
+    /// Probe the book. Returns the packed move with the highest weight,
+    /// plus the total weight sum for that position (for weighted selection).
+    fn probe(&self, zobrist: u64) -> Option<(u16, u16)> {
+        let entries = self.map.get(&zobrist)?;
+        let best = entries.iter().max_by_key(|e| e.weight)?;
+        Some((best.packed_move, best.weight))
+    }
+}
+
+/// Decompress and load the opening book once at first access.
+/// Path: env var `OPENING_BOOK` or default `src/games/chess/filtered.zl`.
+static BOOK: LazyLock<Option<OpeningBook>> = LazyLock::new(|| {
+    let path = std::env::var("OPENING_BOOK")
+        .unwrap_or_else(|_| "static/filtered.bin".into());
+    match OpeningBook::load(&path) {
+        Ok(book) => {
+            crate::log_info(crate::LogMsg::ChessSearch {
+                tt_entries: book.map.len(),
+                depth: 0,
+                fen: format!("opening book loaded ({})", path),
+            });
+            Some(book)
+        },
+        Err(e) => {
+            // Non-fatal: engine works fine without a book.
+            crate::log_warn(crate::LogMsg::DbPing {
+                ok: false,
+                detail: format!("opening book: {e}"),
+            });
+            None
+        },
+    }
+});
+
+// -----------------------------------------------------------------------------
 // Pinned-piece detection (pre-filter illegal moves before make/unmake)
 // -----------------------------------------------------------------------------
 
@@ -2362,6 +2432,28 @@ pub fn best_move(fen: &str, depth: usize) -> Option<String> {
         Ok(board) => board,
         Err(_) => return None,
     };
+
+    // ── Opening book probe: return book move instantly if position is known ──
+    if let Some(book) = BOOK.as_ref() {
+        if let Some((packed_move, _weight)) = book.probe(board.hash) {
+            let (from, to, promo_code) = unpack_move_data(packed_move);
+            if from < 64 && to < 64 {
+                let promo = decode_promotion(promo_code, board.side_to_move);
+                // Verify the book move is legal for this position
+                let legal_moves = generate_pseudo_legal_moves(&board);
+                for i in 0..legal_moves.count {
+                    let mv = legal_moves.moves[i];
+                    if mv.from == from && mv.to == to && mv.promotion == promo {
+                        let result = format!("{}{}", square_name(from), square_name(to));
+                        crate::log_info(crate::LogMsg::ChessResult {
+                            best_move: result.clone(),
+                        });
+                        return Some(result);
+                    }
+                }
+            }
+        }
+    }
 
     crate::log_info(crate::LogMsg::ChessSearch {
         tt_entries: 1 << TT_BITS,

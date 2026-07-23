@@ -25,10 +25,10 @@ hmac = "0.12"
 sha2 = "0.10"
 base64 = "0.22"
 portable-atomic = "1"
-
 [profile.dev]
 opt-level = 0
 debug = true
+codegen-units = 256
 
 [profile.release]
 opt-level = 3
@@ -37,3 +37,5 @@ codegen-units = 1
 debug = false
 strip = "symbols"
 panic = "abort"
+
+

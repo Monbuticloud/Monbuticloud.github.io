@@ -14,9 +14,18 @@ const CHALLENGE_PREFIX: &[u8] = b"challenge";
 /// Shared HMAC secret, decoded once from env.
 static HMAC_KEY: LazyLock<Vec<u8>> = LazyLock::new(|| {
     let raw = std::env::var("AUTH_HMAC_SECRET")
-        .expect("AUTH_HMAC_SECRET env var must be set — 32+ random bytes, base64-encoded");
-    base64::Engine::decode(&base64::engine::general_purpose::STANDARD, &raw)
-        .expect("AUTH_HMAC_SECRET must be valid base64")
+        .expect("AUTH_HMAC_SECRET env var must be set — base64 of 24+ random bytes");
+    let key = base64::Engine::decode(&base64::engine::general_purpose::STANDARD, &raw)
+        .expect("AUTH_HMAC_SECRET must be valid base64");
+    // The var can be *present but empty* (e.g. compose passing "${AUTH_HMAC_SECRET}"
+    // with nothing in .env), which used to silently yield an empty key and fully
+    // forgeable tokens. Fail fast at startup instead.
+    assert!(
+        key.len() >= 24,
+        "AUTH_HMAC_SECRET must decode to at least 24 bytes (got {}); regenerate with: openssl rand -base64 32",
+        key.len(),
+    );
+    key
 });
 
 // ── Challenge HMAC ───────────────────────────────────────────────

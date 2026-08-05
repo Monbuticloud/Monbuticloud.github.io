@@ -16,8 +16,13 @@ fn url() -> String {
 pub async fn connect() -> Result<AsyncPgConnection, diesel::ConnectionError> {
     let mut conn = AsyncPgConnection::establish(&url()).await?;
     // Diesel table types use unqualified names; search_path resolves
-    // `keys` → `auth.keys`, etc.
-    let _ = conn.batch_execute("SET search_path TO public, auth").await;
+    // `keys` → `auth.keys`, etc. Fail loudly if it can't be set — silently
+    // swallowing this would surface later as confusing query errors.
+    // (Not folded into the connection URL: the `options` param route can't
+    // be verified against PgDog without a live instance.)
+    conn.batch_execute("SET search_path TO public, auth")
+        .await
+        .map_err(|e| diesel::ConnectionError::BadConnection(format!("SET search_path failed: {e}")))?;
     Ok(conn)
 }
 

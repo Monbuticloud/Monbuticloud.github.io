@@ -4,7 +4,8 @@
 
 use hmac::{Hmac, Mac};
 use sha2::Sha256;
-use std::sync::LazyLock;
+use std::collections::HashMap;
+use std::sync::{LazyLock, Mutex};
 use subtle::ConstantTimeEq;
 
 type HmacSha256 = Hmac<Sha256>;
@@ -139,7 +140,39 @@ pub fn generate_nonce() -> [u8; 32] {
     rand::random()
 }
 
+/// One-time challenge nonces: nonce -> expires_at.
+/// Prevents replaying an authorize request within the challenge window.
+static USED_NONCES: LazyLock<Mutex<HashMap<[u8; 32], i64>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+
+/// Mark `nonce` as used, expiring at `expires_at`.
+/// Returns false if the nonce was already consumed (replay) — the caller
+/// must reject the request. Expired entries are purged opportunistically.
+pub fn consume_nonce(nonce: &[u8; 32], expires_at: i64) -> bool {
+    let mut used = USED_NONCES.lock().unwrap_or_else(|p| p.into_inner());
+    let now = chrono::Utc::now().timestamp();
+    used.retain(|_, exp| *exp > now);
+    if used.contains_key(nonce) {
+        return false;
+    }
+    used.insert(*nonce, expires_at);
+    true
+}
+
 /// Session expiry as Unix timestamp (N seconds from now).
 pub fn session_expiry(ttl_secs: i64) -> i64 {
     chrono::Utc::now().timestamp() + ttl_secs
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn nonce_is_single_use() {
+        let nonce = [7u8; 32];
+        let expiry = chrono::Utc::now().timestamp() + 60;
+        assert!(consume_nonce(&nonce, expiry), "first use must succeed");
+        assert!(!consume_nonce(&nonce, expiry), "replay must be rejected");
+    }
 }

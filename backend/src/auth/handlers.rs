@@ -193,7 +193,15 @@ pub async fn authorize(Json(body): Json<AuthorizeReq>) -> impl IntoResponse {
         );
     }
 
-    // 3. Session issuance is DISABLED until FALCON signature verification is wired.
+    // 3. One-time nonce: reject replays within the challenge window.
+    if !session::consume_nonce(&nonce, body.expires_at) {
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(serde_json::json!({"error": "nonce already used"})),
+        );
+    }
+
+    // 4. Session issuance is DISABLED until FALCON signature verification is wired.
     //    Previously the FALCON signature was accepted unconditionally, which made
     //    this endpoint mint valid session tokens for any caller — session forgery.
     //    Refuse loudly instead of silently authenticating nobody.

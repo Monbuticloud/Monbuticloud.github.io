@@ -4,7 +4,7 @@
 
 use axum::{
     extract::Query,
-    http::StatusCode,
+    http::{HeaderMap, StatusCode, header},
     response::IntoResponse,
     Json,
 };
@@ -222,8 +222,29 @@ pub async fn authorize(Json(body): Json<AuthorizeReq>) -> impl IntoResponse {
     )
 }
 
-/// POST /api/auth/logout-all — bump nonce_counter, kill all sessions
-pub async fn logout_all(Json(body): Json<LogoutAllReq>) -> impl IntoResponse {
+/// Extract a "Bearer <token>" from the Authorization header.
+fn bearer_token(headers: &HeaderMap) -> Option<&str> {
+    let auth = headers.get(header::AUTHORIZATION)?.to_str().ok()?;
+    auth.strip_prefix("Bearer ").map(str::trim).filter(|t| !t.is_empty())
+}
+
+/// POST /api/auth/logout-all — bump nonce_counter, kill all sessions.
+/// Requires a valid session token for the key_id being logged out; without
+/// it anyone could revoke an arbitrary key's sessions (session DoS).
+pub async fn logout_all(
+    headers: HeaderMap,
+    Json(body): Json<LogoutAllReq>,
+) -> impl IntoResponse {
+    let token = match bearer_token(&headers) {
+        Some(t) => t,
+        None => {
+            return (
+                StatusCode::UNAUTHORIZED,
+                Json(serde_json::json!({"error": "missing bearer session token"})),
+            );
+        },
+    };
+
     let mut conn = match crate::db::connect().await {
         Ok(c) => c,
         Err(e) => {
@@ -236,6 +257,43 @@ pub async fn logout_all(Json(body): Json<LogoutAllReq>) -> impl IntoResponse {
             );
         },
     };
+
+    // Fetch the current counter so the presented token can be verified
+    // against it (sessions are stateless; the counter is the revocation key).
+    let current_counter = match tbl::table
+        .filter(tbl::key_id.eq(&body.key_id))
+        .select(tbl::nonce_counter)
+        .get_result::<i64>(&mut conn)
+        .await
+    {
+        Ok(c) => c,
+        Err(diesel::result::Error::NotFound) => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({"error": "key_id not found"})),
+            );
+        },
+        Err(e) => {
+            crate::log_error(crate::LogMsg::Auth {
+                detail: format!("logout-all: DB select failed: {e}"),
+            });
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "internal error"})),
+            );
+        },
+    };
+
+    // The token must belong to this key_id with the current counter.
+    if !matches!(
+        session::parse_session_token(token, current_counter),
+        Ok(s) if s.key_id == body.key_id
+    ) {
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(serde_json::json!({"error": "invalid or expired session token"})),
+        );
+    }
 
     let result = update(tbl::table.filter(tbl::key_id.eq(&body.key_id)))
         .set(tbl::nonce_counter.eq(tbl::nonce_counter + 1))

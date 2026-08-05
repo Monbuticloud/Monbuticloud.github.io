@@ -370,13 +370,17 @@ async fn serve_static(path: &'static str) -> Response<Body> {
 
     let (status, content) = match tokio::fs::read_to_string(path).await {
         Ok(c) => (StatusCode::OK, c),
-        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "<h1>Internal Server Error</h1>".into()),
+        Err(_) => (StatusCode::NOT_FOUND, "<h1>Not Found</h1>".into()),
     };
 
-    FILE_CACHE
-        .write()
-        .unwrap()
-        .insert(path, (status, content.clone(), mime));
+    // Only cache successful reads — a transient miss (file not yet mounted)
+    // must not be pinned as a permanent error.
+    if status == StatusCode::OK {
+        FILE_CACHE
+            .write()
+            .unwrap()
+            .insert(path, (status, content.clone(), mime));
+    }
 
     Response::builder()
         .status(status)

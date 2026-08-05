@@ -30,6 +30,8 @@ RUN rm -rf src
 COPY src/ src/
 COPY static/*.html static/*.css static/*.js /static/
 COPY static/assets/ /static/assets/
+# Book is embedded in the binary (include_bytes!) — this copy is optional,
+# kept only so OPENING_BOOK=/static/filtered.bin can override at runtime.
 COPY src/games/chess/filtered.bin /static/filtered.bin
 
 # ── Minify static assets (builder stage only — zero impact on final image) ──

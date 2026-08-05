@@ -10,6 +10,27 @@ fn count_moves(board: &Board) -> usize {
     moves.count
 }
 
+/// Parse a UCI move ("e2e4", "e7e8q", ...) into engine Move (a8=0 squares).
+fn uci_move(board: &Board, uci: &str) -> Move {
+    let bytes = uci.as_bytes();
+    let file = |c: u8| (c - b'a') as i8;
+    let rank = |c: u8| (8 - (c - b'0')) as i8;
+    let from = (rank(bytes[1]) * 8 + file(bytes[0])) as u8;
+    let to = (rank(bytes[3]) * 8 + file(bytes[2])) as u8;
+    let promotion = if bytes.len() > 4 {
+        match bytes[4] {
+            b'q' => if board.side_to_move == Color::White { W_QUEEN } else { B_QUEEN },
+            b'r' => if board.side_to_move == Color::White { W_ROOK } else { B_ROOK },
+            b'b' => if board.side_to_move == Color::White { W_BISHOP } else { B_BISHOP },
+            b'n' => if board.side_to_move == Color::White { W_KNIGHT } else { B_KNIGHT },
+            _ => 0,
+        }
+    } else {
+        0
+    };
+    Move { from, to, promotion }
+}
+
 #[test]
 fn start_position_piece_lists() {
     let b = board_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
@@ -204,4 +225,116 @@ fn iterative_deepening_restores() {
         validate_lists(&b);
         assert_eq!(b.hash, hash_before, "hash changed after depth {}", d);
     }
+}
+
+#[test]
+fn incremental_hash_matches_full_hash() {
+    // The book probe uses board.hash (incremental). It MUST equal a full
+    // Zobrist::hash() recompute after every make/unmake, or book hits break.
+    // This exercises the conditional-EP incremental logic in make_move.
+    let fens = [
+        "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+        "rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2", // 1.e4 d5, ep d6 (no capture)
+        "rnbqkb1r/pppp1ppp/5n2/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 3 3", // Italian
+        "r1bqkbnr/pppp1ppp/2n5/1B2p3/4P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 3 3", // Ruy
+    ];
+    for fen in fens {
+        let board = board_fen(fen);
+        assert_eq!(board.hash, ZOBRIST.hash(&board),
+            "parse_fen hash mismatch for {fen}");
+    }
+
+    // Play a few real moves and check incremental == full at every ply.
+    let mut b = board_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+    let moves_uci = ["e2e4", "c7c5", "g1f3", "b8c6", "f1b5", "a7a6", "b5c6", "d7c6"];
+    for m in moves_uci {
+        let mv = uci_move(&b, m);
+        let undo = make_move(&mut b, mv);
+        assert_eq!(b.hash, ZOBRIST.hash(&b),
+            "incremental hash diverged after {m}");
+        let _ = unmake_move(&mut b, mv, undo);
+        assert_eq!(b.hash, ZOBRIST.hash(&b),
+            "incremental hash diverged after unmake {m}");
+        // redo for next ply
+        let undo = make_move(&mut b, mv);
+        let _ = undo;
+    }
+    // And an en-passant capture line (incremental ep path)
+    let mut b = board_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+    let ep_moves = ["e2e4", "d7d5", "e4e5", "f7f5", "e5f6"];
+    for m in ep_moves {
+        let mv = uci_move(&b, m);
+        let undo = make_move(&mut b, mv);
+        assert_eq!(b.hash, ZOBRIST.hash(&b),
+            "incremental hash diverged after ep line {m}");
+        let _ = unmake_move(&mut b, mv, undo);
+        assert_eq!(b.hash, ZOBRIST.hash(&b),
+            "incremental hash diverged after unmake ep line {m}");
+        let undo = make_move(&mut b, mv);
+        let _ = undo;
+    }
+}
+
+#[test]
+fn book_diagnostic() {
+    // Probe the opening book to see which positions are present.
+    // Expected hashes below were verified with python-chess zobrist_hash AND
+    // confirmed present in filtered.bin (the same table + convention).
+    // The book is embedded (BOOK_BYTES) and BOOK is always loaded.
+
+    // (name, fen, expected_python_chess_hash, in_book)
+    let cases: &[(&str, &str, u64, bool)] = &[
+        ("start",   "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", 0x463b96181691fc9c, true),
+        ("1.e4 e5", "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2", 0x0844931a6ef4b9a0, true),
+        ("Sicilian","rnbqkbnr/pp1ppppp/8/2p5/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2", 0x644d4afe02564aeb, true),
+        ("1.d4 d5", "rnbqkbnr/ppp1pppp/8/3p4/3P4/8/PPP1PPPP/RNBQKBNR w KQkq - 0 2", 0x06649ba69b8c9ff8, true),
+        ("1.d4 Nf6 2.c4", "rnbqkb1r/pppppppp/5n2/8/2PP4/8/PP2PPPP/RNBQKBNR b KQkq - 0 2", 0x54c31263e9ad3b4f, true),
+        ("Italian", "r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 3 3", 0x1b7e13263fc0ab38, true),
+        ("Ruy Lopez", "r1bqkbnr/pppp1ppp/2n5/1B2p3/4P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 3 3", 0x4b1376a17217ee1d, true),
+        ("QGD",     "rnbqkbnr/ppp2ppp/4p3/3p4/2PP4/8/PP2PPPP/RNBQKBNR w KQkq - 0 3", 0xfc30f6b3c0a1a4ad, true),
+        ("KID",     "rnbqkb1r/pppppp1p/5np1/8/2PP4/8/PP2PPPP/RNBQKBNR w KQkq - 0 3", 0xbd7741389222a904, true),
+        ("Scandi",  "rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2", 0x0756b94461c50fb0, true),
+        ("1.Nf3",   "rnbqkbnr/pppppppp/8/8/8/5N2/PPPPPPPP/RNBQKB1R b KQkq - 1 1", 0x9d5f7aee7e779da1, true),
+        ("1.c4",    "rnbqkbnr/pppppppp/8/8/2P5/8/PP1PPPPP/RNBQKBNR b KQkq - 0 1", 0xca18093c559e579b, true),
+        ("Petrov",  "rnbqkb1r/pppp1ppp/5n2/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3", 0x88ce4b19abe8990b, true),
+        ("French",  "rnbqkbnr/pppp1ppp/4p3/8/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2", 0xf44b6961e533d1c4, true),
+        ("Caro-Kann","rnbqkbnr/pp1ppppp/2p5/8/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2", 0x104676bf8ad1922d, true),
+        ("1.e4 c5 2.Nf3", "rnbqkbnr/pp1ppppp/8/2p5/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2", 0xbf29a6086ab02bd6, true),
+    ];
+
+    let data = crate::games::chess::main::BOOK_BYTES;
+    let mut book_map: std::collections::HashMap<u64, Vec<u16>> = std::collections::HashMap::new();
+    for chunk in data.chunks_exact(16) {
+        let key = u64::from_be_bytes(chunk[0..8].try_into().unwrap());
+        let mv = u16::from_le_bytes(chunk[8..10].try_into().unwrap());
+        book_map.entry(key).or_default().push(mv);
+    }
+
+    println!("\n=== Opening book diagnostic ===");
+    println!("Book entries: {}", data.len() / 16);
+    println!("Book positions: {}", book_map.len());
+
+    let mut all_pass = true;
+    println!("\n{:<16} {:<18} {:<18} {:<8} {:<8}", "position", "engine_hash", "expected", "hash_ok", "in_book");
+    for (name, fen, expected, in_book) in cases {
+        let b = board_fen(fen);
+        let hash_ok = b.hash == *expected;
+        let hit = book_map.contains_key(&b.hash);
+        // The engine must match python-chess AND the book (if in_book=true).
+        let pass = hash_ok && (hit == *in_book);
+        if !pass { all_pass = false; }
+        println!("{:<16} 0x{:016x} 0x{:016x} {:<8} {:<8}{}",
+            name, b.hash, expected,
+            if hash_ok { "✓" } else { "✗" },
+            if hit { "✓" } else { "✗" },
+            if pass { "" } else { "  <-- FAIL" });
+    }
+
+    if all_pass {
+        println!("\nALL {} positions match python-chess AND the book ✓", cases.len());
+    } else {
+        println!("\nSOME POSITIONS FAIL (see above)");
+    }
+
+    assert!(all_pass, "diagnostic complete");
 }

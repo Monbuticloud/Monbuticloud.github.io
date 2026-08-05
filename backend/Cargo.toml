@@ -23,6 +23,7 @@ rand = "0.8"
 hex = "0.4"
 hmac = "0.12"
 sha2 = "0.10"
+subtle = "2"
 base64 = "0.22"
 portable-atomic = "1"
 [profile.dev]

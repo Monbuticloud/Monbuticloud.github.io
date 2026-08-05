@@ -5,6 +5,7 @@
 use hmac::{Hmac, Mac};
 use sha2::Sha256;
 use std::sync::LazyLock;
+use subtle::ConstantTimeEq;
 
 type HmacSha256 = Hmac<Sha256>;
 const SESSION_PREFIX: &[u8] = b"session";
@@ -36,8 +37,11 @@ pub fn verify_challenge_hmac(
     token: &str,
 ) -> bool {
     let expected = build_challenge_hmac(key_id, nonce, expires_at);
-    // hex comparison is constant-time for equal-length strings
-    expected == token && chrono::Utc::now().timestamp() < expires_at
+    // Constant-time comparison over decoded bytes. `==` on Strings
+    // short-circuits on the first differing byte — a timing side channel.
+    let expected = hex::decode(expected).unwrap_or_default();
+    let provided = hex::decode(token).unwrap_or_default();
+    bool::from(expected.ct_eq(&provided)) && chrono::Utc::now().timestamp() < expires_at
 }
 
 // ── Session token ────────────────────────────────────────────────
@@ -100,7 +104,11 @@ pub fn parse_session_token(token: &str, nonce_counter: i64) -> Result<SessionDat
         hex::encode(mac.finalize().into_bytes())
     };
 
-    if parts[3] != expected {
+    // Constant-time comparison over decoded bytes (see verify_challenge_hmac).
+    let expected = hex::decode(expected).unwrap_or_default();
+    let provided = hex::decode(parts[3]).unwrap_or_default();
+
+    if !bool::from(provided.ct_eq(&expected)) {
         return Err("session token: HMAC mismatch (revoked, forged, or wrong key)");
     }
 

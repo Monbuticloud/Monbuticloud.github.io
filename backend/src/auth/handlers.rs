@@ -14,7 +14,6 @@ use diesel::{
     QueryDsl,
     Queryable,
     Selectable,
-    SelectableHelper,
     insert_into,
     update,
 };
@@ -185,67 +184,32 @@ pub async fn authorize(Json(body): Json<AuthorizeReq>) -> impl IntoResponse {
         );
     }
 
-    // 3. Look up key from DB
-    let mut conn = match crate::db::connect().await {
-        Ok(c) => c,
-        Err(e) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::json!({"error": format!("DB connection failed: {e}")})),
-            );
-        },
-    };
-
-    let key = match tbl::table
-        .filter(tbl::key_id.eq(&body.key_id))
-        .filter(tbl::is_active.eq(true))
-        .select(KeyRow::as_select())
-        .get_result::<KeyRow>(&mut conn)
-        .await
-    {
-        Ok(row) => row,
-        Err(diesel::result::Error::NotFound) => {
-            return (
-                StatusCode::UNAUTHORIZED,
-                Json(serde_json::json!({"error": "unknown or inactive key_id"})),
-            );
-        },
-        Err(e) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::json!({"error": format!("DB lookup failed: {e}")})),
-            );
-        },
-    };
-
-    // 4. Verify FALCON signature
-    let sig = match base64::Engine::decode(
-        &base64::engine::general_purpose::STANDARD,
-        &body.falcon_sig,
-    ) {
-        Ok(b) => b,
-        Err(_) => {
-            return (
-                StatusCode::BAD_REQUEST,
-                Json(serde_json::json!({"error": "falcon_sig must be valid base64"})),
-            );
-        },
-    };
-
-    // TODO: falcon_verify(&key.pub_key, &nonce, &sig)
-    //   Add `falcon` crate and wire verification here.
-    let _ = sig;
-
-    // 5. Issue session token (1-hour TTL)
-    let expiry = session::session_expiry(3600);
-    let token = session::build_session_token(&body.key_id, key.nonce_counter, expiry);
-
+    // 3. Session issuance is DISABLED until FALCON signature verification is wired.
+    //    Previously the FALCON signature was accepted unconditionally, which made
+    //    this endpoint mint valid session tokens for any caller — session forgery.
+    //    Refuse loudly instead of silently authenticating nobody.
+    //
+    //    TODO: wire the flow below when the `falcon` crate lands:
+    //      let mut conn = crate::db::connect().await?;
+    //      let key = tbl::table
+    //          .filter(tbl::key_id.eq(&body.key_id))
+    //          .filter(tbl::is_active.eq(true))
+    //          .select(KeyRow::as_select())
+    //          .get_result::<KeyRow>(&mut conn).await?;
+    //      if !falcon_verify(&key.pub_key, &nonce, &sig) {
+    //          return (StatusCode::UNAUTHORIZED, Json(json!({"error": "bad signature"})));
+    //      }
+    //      let expiry = session::session_expiry(3600);
+    //      let token = session::build_session_token(&body.key_id, key.nonce_counter, expiry);
+    //      return (StatusCode::OK, Json(json!({
+    //          "session_token": token,
+    //          "capabilities": key.capabilities,
+    //          "expires_at": expiry,
+    //      })));
     (
-        StatusCode::OK,
+        StatusCode::SERVICE_UNAVAILABLE,
         Json(serde_json::json!({
-            "session_token": token,
-            "capabilities": key.capabilities,
-            "expires_at": expiry,
+            "error": "session issuance disabled: FALCON signature verification not yet wired",
         })),
     )
 }

@@ -313,7 +313,10 @@ fn main() {
             .route("/projects.js", get(|| serve_static("static/projects.js")))
             .route("/projects.css", get(|| serve_static("static/projects.css")))
             //-static assets
-            .nest_service("/static/assets", ServeDir::new("/static/assets"))
+            // CWD-relative so it works in local dev (cargo run) and in the
+            // container (WORKDIR-less scratch → CWD=/). In production nginx
+            // serves /static/assets/ directly and shadows this route.
+            .nest_service("/static/assets", ServeDir::new("static/assets"))
             //-common.js
             .route("/common.js", get(|| serve_static("static/common.js")))
             //-common.css

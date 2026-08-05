@@ -8,10 +8,13 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 /// Dedicated thread pool for chess search (tiny stacks, no tokio blocking pool).
 /// The engine uses ~70KB stack at peak; 256KB gives 8× margin.
+/// Sized to the available cores: each search spawns 1 leader + up to 3
+/// helpers, and the semaphore below caps concurrent searches at pool/4, so
+/// every permitted search's tasks run at once without oversubscribing the CPU.
 static CHESS_POOL: std::sync::LazyLock<rayon::ThreadPool> = std::sync::LazyLock::new(|| {
-    let cpus = std::thread::available_parallelism().map_or(4, |n| n.get());
+    let cpus = std::thread::available_parallelism().map_or(2, |n| n.get()).max(1);
     rayon::ThreadPoolBuilder::new()
-        .num_threads(cpus.clamp(32, 128))
+        .num_threads(cpus)
         .thread_name(|i| format!("chess-{i}"))
         .stack_size(256 * 1024)
         .build()
@@ -21,12 +24,11 @@ static CHESS_POOL: std::sync::LazyLock<rayon::ThreadPool> = std::sync::LazyLock:
 /// Max concurrent chess searches. Beyond this the handler returns 503 immediately.
 /// Each search uses 1 leader + 3 helpers = 4 pool threads.
 /// Permit count = pool_size / 4 so we never oversubscribe the pool.
-/// On a 4‑core machine: pool=32 → 8 permits.
+/// On a 4‑core machine: pool=4 → 1 permit.
 /// On a 128‑core machine: pool=128 → 32 permits.
 static CHESS_SEMAPHORE: std::sync::LazyLock<Semaphore> = std::sync::LazyLock::new(|| {
-    let cpus = std::thread::available_parallelism().map_or(4, |n| n.get());
-    let pool_size = cpus.clamp(32, 128);
-    Semaphore::new(pool_size / 4)
+    let cpus = std::thread::available_parallelism().map_or(2, |n| n.get()).max(1);
+    Semaphore::new((cpus / 4).max(1))
 });
 
 use axum::{

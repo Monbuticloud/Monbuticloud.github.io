@@ -79,7 +79,6 @@ pub fn build_session_token(key_id: &str, nonce_counter: i64, expiry: i64) -> Str
 #[derive(Debug)]
 pub struct SessionData {
     pub key_id: String,
-    pub capabilities: i16,
     pub expiry: i64,
 }
 
@@ -128,7 +127,6 @@ pub fn parse_session_token(token: &str, nonce_counter: i64) -> Result<SessionDat
 
     Ok(SessionData {
         key_id,
-        capabilities: 15, // caller should override with DB lookup
         expiry,
     })
 }

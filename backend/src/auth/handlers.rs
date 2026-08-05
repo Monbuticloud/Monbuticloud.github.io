@@ -113,16 +113,17 @@ pub async fn register_key(Json(body): Json<RegisterKeyReq>) -> impl IntoResponse
             label: "",
             pub_key: &pub_key,
         })
-        .on_conflict(tbl::key_id)
-        .do_update()
-        .set((
-            tbl::pub_key.eq(&pub_key),
-            tbl::is_active.eq(true),
-        ))
+        // Refuse to overwrite an existing key_id — a re-registration would
+        // let an attacker bind their own pubkey to a victim's key_id.
+        .on_conflict_do_nothing()
         .execute(&mut conn)
         .await;
 
     match result {
+        Ok(0) => (
+            StatusCode::CONFLICT,
+            Json(serde_json::json!({"error": "key_id already registered"})),
+        ),
         Ok(_) => (
             StatusCode::CREATED,
             Json(serde_json::json!({"key_id": body.key_id})),

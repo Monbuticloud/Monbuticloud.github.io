@@ -31,15 +31,15 @@ Rust HTTP server serving portfolio pages, a Lazy SMP chess engine, and FALCON po
 1. **No client-side connection pool** — PgDog is the pooler. Open/drop as needed.
 2. **Zero heap in search** — Piece lists are `[u8; 16]` arrays, stack-only. `mimalloc` global allocator.
 3. **Depth 1–15** — Invalid depth returns 400. Depth 13+ gated behind FALCON auth (not wired yet).
-4. **Stateless sessions** — HMAC token with `nonce_counter`. No session table.
+4. **Stateless sessions** — HMAC token with `nonce_counter`. No session table. Challenge nonces are single-use (replay-protected); `logout-all` requires a valid session token.
 5. **Lazy SMP** — `rayon::scope` with `CHESS_POOL` (dedicated Rayon pool, 256KB stacks).
 6. **Semaphore backpressure** — `CHESS_SEMAPHORE`, `try_acquire` → 503 immediately.
-7. **Auth** — FALCON pub key is public by definition. Signup is open. Private key never touches the server.
+7. **Auth** — FALCON pub key is public by definition. Registration is open but refuses to overwrite an existing `key_id` (409). Private key never touches the server.
 8. **Diesel** — Type-safe queries, `table!` macro, no raw SQL for auth.
 
 ## Work Guidance
 
-- FALCON verify on server is **stubbed** (accepts any signature). Wire `fn_dsa::verify()` when ready.
+- FALCON verify on server is **stubbed** — `authorize` refuses session issuance (503) until `fn_dsa::verify()` is wired. The intended lookup→verify→issue flow is documented in a TODO in `auth/handlers.rs`.
 - `AUTH_HMAC_SECRET` is required (base64, at least 24 bytes). Server panics if unset.
 - `build.rs` links Homebrew `libpq` on macOS — no env vars needed for local builds.
 - Tests live in `src/tests/` as a mirror of `src/` (e.g. `src/tests/games/chess/main.rs`), wired via `#[path]`.

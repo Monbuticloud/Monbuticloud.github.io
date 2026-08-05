@@ -97,9 +97,12 @@ pub async fn register_key(Json(body): Json<RegisterKeyReq>) -> impl IntoResponse
     let mut conn = match crate::db::connect().await {
         Ok(c) => c,
         Err(e) => {
+            crate::log_error(crate::LogMsg::Auth {
+                detail: format!("register: DB connect failed: {e}"),
+            });
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::json!({"error": format!("DB connection failed: {e}")})),
+                Json(serde_json::json!({"error": "internal error"})),
             );
         },
     };
@@ -124,10 +127,15 @@ pub async fn register_key(Json(body): Json<RegisterKeyReq>) -> impl IntoResponse
             StatusCode::CREATED,
             Json(serde_json::json!({"key_id": body.key_id})),
         ),
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": format!("DB insert failed: {e}")})),
-        ),
+        Err(e) => {
+            crate::log_error(crate::LogMsg::Auth {
+                detail: format!("register: DB insert failed: {e}"),
+            });
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "internal error"})),
+            )
+        },
     }
 }
 
@@ -219,9 +227,12 @@ pub async fn logout_all(Json(body): Json<LogoutAllReq>) -> impl IntoResponse {
     let mut conn = match crate::db::connect().await {
         Ok(c) => c,
         Err(e) => {
+            crate::log_error(crate::LogMsg::Auth {
+                detail: format!("logout-all: DB connect failed: {e}"),
+            });
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::json!({"error": format!("DB connection failed: {e}")})),
+                Json(serde_json::json!({"error": "internal error"})),
             );
         },
     };
@@ -241,9 +252,14 @@ pub async fn logout_all(Json(body): Json<LogoutAllReq>) -> impl IntoResponse {
             StatusCode::NOT_FOUND,
             Json(serde_json::json!({"error": "key_id not found"})),
         ),
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": format!("DB update failed: {e}")})),
-        ),
+        Err(e) => {
+            crate::log_error(crate::LogMsg::Auth {
+                detail: format!("logout-all: DB update failed: {e}"),
+            });
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "internal error"})),
+            )
+        },
     }
 }

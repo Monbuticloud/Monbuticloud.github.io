@@ -99,6 +99,9 @@ pub(crate) enum LogMsg {
     ChessResult {
         best_move: String,
     },
+    Auth {
+        detail: String,
+    },
     ResourceUsage {
         rss_kb: u64,
         vm_kb: u64,
@@ -127,6 +130,7 @@ impl std::fmt::Display for LogMsg {
             },
             LogMsg::ChessNoMove => write!(f, "[chess]  => None (no valid move found across all depths)"),
             LogMsg::ChessResult { best_move } => write!(f, "[chess]  => {best_move}"),
+            LogMsg::Auth { detail } => write!(f, "[auth] {detail}"),
             LogMsg::ResourceUsage {
                 rss_kb,
                 vm_kb,

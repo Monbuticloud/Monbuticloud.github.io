@@ -338,9 +338,31 @@ fn parse_fen(fen: &str) -> Result<Board, &'static str> {
         return Err("FEN must have at least 4 fields (board, side, castling, en_passant)");
     }
 
+    if fen.len() > 512 {
+
+        return Err("FEN too long");
+    }
+
     // Board placement
     // Each row from the FEN represents one rank, starting with rank 8 (top)
     let rows: Vec<&str> = parts[0].split('/').collect();
+
+    if rows.len() != 8 {
+
+        return Err("FEN board must have exactly 8 ranks");
+    }
+
+    let mut white_total = 0u8;
+
+    let mut black_total = 0u8;
+
+    let mut white_pawns = 0u8;
+
+    let mut black_pawns = 0u8;
+
+    let mut white_kings = 0u8;
+
+    let mut black_kings = 0u8;
 
     for (rank_index, row) in rows.iter().enumerate() {
 
@@ -353,13 +375,18 @@ fn parse_fen(fen: &str) -> Result<Board, &'static str> {
 
                 let count = character.to_digit(10).expect("validated digit") as usize;
 
-                for _ in 0..count {
+                file += count;
 
-                    board.board[rank * 8 + file] = EMPTY;
+                if file > 8 {
 
-                    file += 1;
+                    return Err("FEN rank overflows 8 files");
                 }
             } else {
+
+                if file >= 8 {
+
+                    return Err("FEN rank overflows 8 files");
+                }
 
                 let piece = match character {
                     'P' => W_PAWN,
@@ -374,7 +401,7 @@ fn parse_fen(fen: &str) -> Result<Board, &'static str> {
                     'r' => B_ROOK,
                     'q' => B_QUEEN,
                     'k' => B_KING,
-                    _ => EMPTY,
+                    _ => return Err("FEN contains an invalid piece character"),
                 };
 
                 let sq = (rank * 8 + file) as u8;
@@ -389,9 +416,49 @@ fn parse_fen(fen: &str) -> Result<Board, &'static str> {
                     _ => {},
                 }
 
+                if piece > 0 {
+
+                    white_total += 1;
+
+                    match piece {
+                        W_PAWN => white_pawns += 1,
+                        W_KING => white_kings += 1,
+                        _ => {},
+                    }
+                } else {
+
+                    black_total += 1;
+
+                    match piece {
+                        B_PAWN => black_pawns += 1,
+                        B_KING => black_kings += 1,
+                        _ => {},
+                    }
+                }
+
+                if white_total > 16 || black_total > 16 {
+
+                    return Err("FEN has more than 16 pieces on one side");
+                }
+
+                if white_pawns > 8 || black_pawns > 8 {
+
+                    return Err("FEN has more than 8 pawns on one side");
+                }
+
                 file += 1;
             }
         }
+
+        if file != 8 {
+
+            return Err("FEN rank must span exactly 8 files");
+        }
+    }
+
+    if white_kings != 1 || black_kings != 1 {
+
+        return Err("FEN must contain exactly one king per side");
     }
 
     // Side to move
@@ -429,14 +496,15 @@ fn parse_fen(fen: &str) -> Result<Board, &'static str> {
 
         let rank_char = ep_chars.next().ok_or("invalid en-passant square (rank)")?;
 
-        let file = (file_char as u8 - b'a') as usize;
+        let file = match (file_char as u8).checked_sub(b'a') {
+            Some(f) if f < 8 => f as usize,
+            _ => return Err("invalid en-passant square (file)"),
+        };
 
-        let rank = (8 - (rank_char as u8 - b'0')) as usize;
-
-        if file >= 8 || rank >= 8 {
-
-            return Err("invalid en-passant square (out of bounds)");
-        }
+        let rank = match (rank_char as u8).checked_sub(b'0') {
+            Some(r) if (1..=8).contains(&r) => (8 - r) as usize,
+            _ => return Err("invalid en-passant square (rank)"),
+        };
 
         board.en_passant_square = (rank * 8 + file) as i8;
     } else {

@@ -338,3 +338,34 @@ fn book_diagnostic() {
 
     assert!(all_pass, "diagnostic complete");
 }
+
+#[test]
+fn parse_fen_rejects_malformed_input() {
+    // Every one of these used to panic (index out of bounds) or silently
+    // accept garbage. They must all return Err — never panic, never succeed.
+    let bad = [
+        "",
+        "8/8/8/8/8/8/8/8",                       // < 4 fields
+        "8/8/8/8/8/8/8/8/8 w - - 0 1",           // 9 ranks (used to panic)
+        "8/8/8/8/8/8/8/99 w - - 0 1",            // rank overflows (used to panic)
+        "8/8/8/8/8/8/8/88 w - - 0 1",            // rank overflows via digits
+        "8/8/8/8/8/8/8/8P w - - 0 1",            // piece after full rank
+        "8/8/8/8/8/8/8/7 w - - 0 1",             // rank underfills
+        "7x/8/8/8/8/8/8/8 w - - 0 1",            // invalid piece character
+        "8/8/8/8/8/8/8/8 w KQkq e9 0 1",         // ep rank out of range
+        "8/8/8/8/8/8/8/8 w KQkq a0 0 1",         // ep rank underflow (used to panic in debug)
+        "K6K/8/8/8/8/8/8/k7 w - - 0 1",          // two white kings
+        "8/8/8/8/8/8/8/8 w - - 0 1",             // no kings
+        "pppppppp/8/8/8/8/8/8/ppp w - - 0 1",    // 11 pawns on one side
+    ];
+    for fen in bad {
+        assert!(parse_fen(fen).is_err(), "expected Err for: {fen}");
+    }
+
+    // Over-length FEN (the length cap rejects it before any parsing)
+    let long = format!("K7/8/8/8/8/8/8/8 w - - 0 {}", "1".repeat(600));
+    assert!(parse_fen(&long).is_err(), "expected Err for over-length FEN");
+
+    // Valid minimal position still parses
+    assert!(parse_fen("k7/8/8/8/8/8/8/K7 w - - 0 1").is_ok());
+}

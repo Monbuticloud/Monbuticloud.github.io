@@ -84,6 +84,7 @@ Default section order:
 - No heap allocations inside chess search/move generation
 - `mimalloc` global allocator
 - Strict `#[allow(dead_code)]` on log tools — keep them even if unused
+- Commit atomically **as you go** — small, focused commits the moment a unit of work is done; don't batch unrelated changes or wait until the end. More, smaller commits is usually better. Conventional format: `type(scope): description`.
 
 ## Purpose
 

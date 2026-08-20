@@ -80,17 +80,13 @@ const QUEEN_VALUE: i32 = 900;
 
 const KING_VALUE: i32 = 20000;
 
-fn piece_value(piece: i8) -> i32 {
+/// Material values indexed by piece type (abs value): 0=empty, 1=pawn … 6=king.
+const PIECE_VALUE: [i32; 7] = [
+    0, PAWN_VALUE, KNIGHT_VALUE, BISHOP_VALUE, ROOK_VALUE, QUEEN_VALUE, KING_VALUE,
+];
 
-    match piece.abs() {
-        1 => PAWN_VALUE,
-        2 => KNIGHT_VALUE,
-        3 => BISHOP_VALUE,
-        4 => ROOK_VALUE,
-        5 => QUEEN_VALUE,
-        6 => KING_VALUE,
-        _ => 0,
-    }
+fn piece_value(piece: i8) -> i32 {
+    PIECE_VALUE[piece.unsigned_abs() as usize]
 }
 
 fn piece_to_list_idx(piece: i8) -> usize {
@@ -577,6 +573,34 @@ impl MoveList {
     }
 }
 
+/// Push all sliding moves from `square` along `directions` until blocked.
+/// Generic across all 8 directions; the per-step file check stops a move the
+/// moment it would wrap off the board edge (e.g. a1 → h2 via -1).
+fn gen_sliding(moves: &mut MoveList, board: &Board, square: Square, current_sign: i8, directions: &[i8]) {
+    for &direction in directions {
+        let mut current_square = square as i8 + direction;
+        while (0..64).contains(&current_square) {
+            // File-wrap check: this step wrapped off the board edge if the
+            // file changed by more than 1 from the square we came from.
+            let prev = current_square - direction;
+            let prev_file = prev as usize % 8;
+            let cur_file = current_square as usize % 8;
+            if (prev_file as i8 - cur_file as i8).abs() > 1 {
+                break;
+            }
+            let target = board.board[current_square as usize];
+            if target != EMPTY {
+                if (target > 0) != (current_sign == 1) {
+                    moves.push(Move::new(square, current_square as u8));
+                }
+                break;
+            }
+            moves.push(Move::new(square, current_square as u8));
+            current_square += direction;
+        }
+    }
+}
+
 fn generate_pseudo_legal_moves(board: &Board) -> MoveList {
 
     let mut moves = MoveList::new();
@@ -731,135 +755,16 @@ fn generate_pseudo_legal_moves(board: &Board) -> MoveList {
                 }
             },
             3 => {
-
                 // ── Bishop ──
-                for &direction in &[-9, -7, 7, 9] {
-
-                    // File boundary check for initial step
-                    let moving_left = direction == -9 || direction == 7;
-
-                    let moving_right = direction == -7 || direction == 9;
-
-                    if (moving_left && square.is_multiple_of(8)) || (moving_right && square % 8 == 7) {
-
-                        continue;
-                    }
-
-                    let mut current_square = square as i8 + direction;
-
-                    while (0..64).contains(&current_square) {
-
-                        let target = board.board[current_square as usize];
-
-                        if target != EMPTY {
-
-                            if (target > 0) != (current_sign == 1) {
-
-                                moves.push(Move::new(square, current_square as u8));
-                            }
-
-                            break;
-                        }
-
-                        moves.push(Move::new(square, current_square as u8));
-
-                        // File wrap check before next step
-                        if (moving_left && (current_square as usize).is_multiple_of(8))
-                            || (moving_right && (current_square as usize) % 8 == 7)
-                        {
-
-                            break;
-                        }
-
-                        current_square += direction;
-                    }
-                }
+                gen_sliding(&mut moves, board, square, current_sign, &[-9, -7, 7, 9]);
             },
             4 => {
-
                 // ── Rook ──
-                for &direction in &[-8, -1, 1, 8] {
-
-                    // File boundary: horizontal moves can't wrap off the edge
-                    if (direction == -1 && square.is_multiple_of(8)) || (direction == 1 && square % 8 == 7) {
-
-                        continue;
-                    }
-
-                    let mut current_square = square as i8 + direction;
-
-                    while (0..64).contains(&current_square) {
-
-                        let target = board.board[current_square as usize];
-
-                        if target != EMPTY {
-
-                            if (target > 0) != (current_sign == 1) {
-
-                                moves.push(Move::new(square, current_square as u8));
-                            }
-
-                            break;
-                        }
-
-                        moves.push(Move::new(square, current_square as u8));
-
-                        // File wrap check before next horizontal step
-                        if (direction == -1 && (current_square as usize).is_multiple_of(8))
-                            || (direction == 1 && (current_square as usize) % 8 == 7)
-                        {
-
-                            break;
-                        }
-
-                        current_square += direction;
-                    }
-                }
+                gen_sliding(&mut moves, board, square, current_sign, &[-8, -1, 1, 8]);
             },
             5 => {
-
                 // ── Queen (bishop + rook combined) ──
-                for &direction in &[-9, -8, -7, -1, 1, 7, 8, 9] {
-
-                    // File boundary: diagonal/horizontal moves can't wrap
-                    let moving_left = direction == -9 || direction == -1 || direction == 7;
-
-                    let moving_right = direction == -7 || direction == 1 || direction == 9;
-
-                    if (moving_left && square.is_multiple_of(8)) || (moving_right && square % 8 == 7) {
-
-                        continue;
-                    }
-
-                    let mut current_square = square as i8 + direction;
-
-                    while (0..64).contains(&current_square) {
-
-                        let target = board.board[current_square as usize];
-
-                        if target != EMPTY {
-
-                            if (target > 0) != (current_sign == 1) {
-
-                                moves.push(Move::new(square, current_square as u8));
-                            }
-
-                            break;
-                        }
-
-                        moves.push(Move::new(square, current_square as u8));
-
-                        // File wrap check before next step
-                        if (moving_left && (current_square as usize).is_multiple_of(8))
-                            || (moving_right && (current_square as usize) % 8 == 7)
-                        {
-
-                            break;
-                        }
-
-                        current_square += direction;
-                    }
-                }
+                gen_sliding(&mut moves, board, square, current_sign, &[-9, -8, -7, -1, 1, 7, 8, 9]);
             },
             6 => {
 
@@ -1942,7 +1847,7 @@ struct Zobrist {
 }
 
 impl Zobrist {
-    fn new() -> Self {
+    const fn new() -> Self {
         Zobrist { keys: POLYGLOT_KEYS }
     }
 
@@ -1992,7 +1897,7 @@ impl Zobrist {
     }
 }
 
-static ZOBRIST: LazyLock<Zobrist> = LazyLock::new(Zobrist::new);
+static ZOBRIST: Zobrist = Zobrist::new();
 
 // -----------------------------------------------------------------------------
 // Move packing for TT storage (16 bits: from:6, to:6, promo:4)
@@ -2710,21 +2615,39 @@ fn search(board: &mut Board, depth: usize, mut alpha: i32, beta: i32, killers: &
 // Public API
 // -----------------------------------------------------------------------------
 
-#[allow(dead_code)]
-fn best_move_single(fen: &str, depth: usize) -> Option<String> {
-    let board = parse_fen(fen).ok()?;
-    let mut local_board = board;
+/// Iterative deepening: search depths 1..=max, keep the best valid move found.
+/// `on_depth` runs after each completed depth — return false to stop early.
+/// Shared by the single-threaded path and every Lazy SMP task (leader + helpers).
+fn iterative_deepen(
+    board: &Board,
+    max_depth: usize,
+    mut on_depth: impl FnMut(usize, i32, Move) -> bool,
+) -> Move {
+    let mut local_board = board.clone();
     let mut killers = [[Move { from: 0, to: 0, promotion: 0 }; 2]; MAX_PLY];
     let mut best = Move { from: 0, to: 0, promotion: 0 };
 
-    for current_depth in 1..=depth {
-        let (_score, mv) = search(&mut local_board, current_depth, -30000, 30000, &mut killers, 0);
+    for current_depth in 1..=max_depth {
+        // Validate before and after search
+        validate_piece_lists!(&local_board, "iterative deepen depth {}", current_depth);
+        let (score, mv) = search(&mut local_board, current_depth, -30000, 30000, &mut killers, 0);
+        validate_piece_lists!(&local_board, "iterative deepen depth {}", current_depth);
         let is_valid = mv.from != mv.to || mv.promotion != 0;
         if is_valid {
             best = mv;
         }
+        if !on_depth(current_depth, score, mv) {
+            break;
+        }
     }
 
+    best
+}
+
+#[allow(dead_code)]
+fn best_move_single(fen: &str, depth: usize) -> Option<String> {
+    let board = parse_fen(fen).ok()?;
+    let best = iterative_deepen(&board, depth, |_, _, _| true);
     if best.from == best.to {
         return None;
     }
@@ -2782,16 +2705,7 @@ pub fn best_move(fen: &str, depth: usize) -> Option<String> {
     rayon::scope(|s| {
         // ── Thread 0 (leader): full ID search ──
         s.spawn(|_| {
-            let mut local_board = board.clone();
-            let mut killers = [[Move { from: 0, to: 0, promotion: 0 }; 2]; MAX_PLY];
-            let mut best = Move { from: 0, to: 0, promotion: 0 };
-
-            for current_depth in 1..=depth {
-                // Validate before search
-                validate_piece_lists!(&local_board, "leader before depth {}", current_depth);
-                let (score, mv) = search(&mut local_board, current_depth, -30000, 30000, &mut killers, 0);
-                // Validate after search
-                validate_piece_lists!(&local_board, "leader after depth {}", current_depth);
+            let best = iterative_deepen(&board, depth, |current_depth, score, mv| {
                 let is_valid = mv.from != mv.to || mv.promotion != 0;
 
                 crate::log_debug(crate::LogMsg::ChessDepth {
@@ -2801,10 +2715,8 @@ pub fn best_move(fen: &str, depth: usize) -> Option<String> {
                     is_valid,
                 });
 
-                if is_valid {
-                    best = mv;
-                }
-            }
+                true
+            });
 
             *best_move_cell.lock().unwrap() = Some(best);
             leader_finished.store(true, Ordering::Release);
@@ -2813,17 +2725,9 @@ pub fn best_move(fen: &str, depth: usize) -> Option<String> {
         // ── Helper tasks: same search, sharing only the TT ──
         for _ in 1..num_threads {
             s.spawn(|_| {
-                let mut local_board = board.clone();
-                let mut killers = [[Move { from: 0, to: 0, promotion: 0 }; 2]; MAX_PLY];
-
-                for current_depth in 1..=depth {
-                    if leader_finished.load(Ordering::Acquire) {
-                        break;
-                    }
-                    validate_piece_lists!(&local_board, "helper before depth {}", current_depth);
-                    search(&mut local_board, current_depth, -30000, 30000, &mut killers, 0);
-                    validate_piece_lists!(&local_board, "helper after depth {}", current_depth);
-                }
+                iterative_deepen(&board, depth, |_, _, _| {
+                    !leader_finished.load(Ordering::Acquire)
+                });
             });
         }
     });

@@ -1,6 +1,4 @@
 // ── HMAC operations + session token build/verify ──
-// SessionData and parse_session_token unused until middleware is wired.
-#![allow(dead_code)]
 
 use hmac::{Hmac, Mac};
 use sha2::Sha256;
@@ -56,6 +54,9 @@ pub fn verify_challenge_hmac(
 
 // ── Session token ────────────────────────────────────────────────
 
+// Session issuance is not wired yet (see TODO in api/auth.rs) — kept for the
+// authorize flow once FALCON verification lands.
+#[allow(dead_code)]
 pub fn build_session_token(key_id: &str, nonce_counter: i64, expiry: i64) -> String {
     let salt: [u8; 16] = rand::random();
 
@@ -79,6 +80,7 @@ pub fn build_session_token(key_id: &str, nonce_counter: i64, expiry: i64) -> Str
 #[derive(Debug)]
 pub struct SessionData {
     pub key_id: String,
+    #[allow(dead_code)] // expiry is carried by the token itself; read by future middleware
     pub expiry: i64,
 }
 
@@ -158,6 +160,7 @@ pub fn consume_nonce(nonce: &[u8; 32], expires_at: i64) -> bool {
 }
 
 /// Session expiry as Unix timestamp (N seconds from now).
+#[allow(dead_code)]
 pub fn session_expiry(ttl_secs: i64) -> i64 {
     chrono::Utc::now().timestamp() + ttl_secs
 }

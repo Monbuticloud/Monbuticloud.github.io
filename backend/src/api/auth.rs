@@ -1,6 +1,4 @@
-// ── Auth route handlers (type-safe Diesel queries) ──
-// pub_key field unused until FALCON verification is wired.  Expected dead code.
-#![allow(dead_code)]
+// ── Auth API route handlers (type-safe Diesel queries) ──
 
 use axum::{
     extract::Query,
@@ -38,6 +36,7 @@ pub struct AuthorizeReq {
     pub nonce: String,       // hex from challenge
     pub hmac_token: String,  // hex from challenge
     pub expires_at: i64,     // timestamp from challenge
+    #[allow(dead_code)] // unused until FALCON verification is wired
     pub falcon_sig: String,  // base64 FALCON signature over nonce
 }
 
@@ -56,6 +55,8 @@ struct NewKey<'a> {
     pub_key: &'a [u8],
 }
 
+// pub_key field unused until FALCON verification is wired.  Expected dead code.
+#[allow(dead_code)]
 #[derive(Queryable, Selectable)]
 #[diesel(table_name = crate::schema::auth::keys)]
 struct KeyRow {
@@ -66,13 +67,15 @@ struct KeyRow {
 
 // ── Handlers ─────────────────────────────────────────────────────
 
+/// Uniform error response: `{"error": <msg>}`.
+fn err(status: StatusCode, msg: &str) -> (StatusCode, Json<serde_json::Value>) {
+    (status, Json(serde_json::json!({ "error": msg })))
+}
+
 /// POST /api/auth/keys — register a FALCON public key
 pub async fn register_key(Json(body): Json<RegisterKeyReq>) -> impl IntoResponse {
     if body.key_id.is_empty() || body.key_id.len() > 64 {
-        return (
-            StatusCode::BAD_REQUEST,
-            Json(serde_json::json!({"error": "key_id must be 1–64 chars"})),
-        );
+        return err(StatusCode::BAD_REQUEST, "key_id must be 1–64 chars");
     }
 
     let pub_key = match base64::Engine::decode(
@@ -80,18 +83,8 @@ pub async fn register_key(Json(body): Json<RegisterKeyReq>) -> impl IntoResponse
         &body.pub_key,
     ) {
         Ok(b) if b.len() <= 4096 => b,
-        Ok(_) => {
-            return (
-                StatusCode::BAD_REQUEST,
-                Json(serde_json::json!({"error": "pub_key too large (max 4096 bytes)"})),
-            );
-        },
-        Err(_) => {
-            return (
-                StatusCode::BAD_REQUEST,
-                Json(serde_json::json!({"error": "pub_key must be valid base64"})),
-            );
-        },
+        Ok(_) => return err(StatusCode::BAD_REQUEST, "pub_key too large (max 4096 bytes)"),
+        Err(_) => return err(StatusCode::BAD_REQUEST, "pub_key must be valid base64"),
     };
 
     let mut conn = match crate::db::connect().await {
@@ -100,10 +93,7 @@ pub async fn register_key(Json(body): Json<RegisterKeyReq>) -> impl IntoResponse
             crate::log_error(crate::LogMsg::Auth {
                 detail: format!("register: DB connect failed: {e}"),
             });
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::json!({"error": "internal error"})),
-            );
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "internal error");
         },
     };
 
@@ -120,10 +110,7 @@ pub async fn register_key(Json(body): Json<RegisterKeyReq>) -> impl IntoResponse
         .await;
 
     match result {
-        Ok(0) => (
-            StatusCode::CONFLICT,
-            Json(serde_json::json!({"error": "key_id already registered"})),
-        ),
+        Ok(0) => err(StatusCode::CONFLICT, "key_id already registered"),
         Ok(_) => (
             StatusCode::CREATED,
             Json(serde_json::json!({"key_id": body.key_id})),
@@ -132,26 +119,16 @@ pub async fn register_key(Json(body): Json<RegisterKeyReq>) -> impl IntoResponse
             crate::log_error(crate::LogMsg::Auth {
                 detail: format!("register: DB insert failed: {e}"),
             });
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::json!({"error": "internal error"})),
-            )
+            err(StatusCode::INTERNAL_SERVER_ERROR, "internal error")
         },
     }
 }
 
 /// GET /api/auth/challenge?key_id=xxx — get a challenge nonce
-pub async fn challenge(
-    Query(params): Query<HashMap<String, String>>,
-) -> impl IntoResponse {
+pub async fn challenge(Query(params): Query<HashMap<String, String>>) -> impl IntoResponse {
     let key_id = match params.get("key_id") {
         Some(k) if !k.is_empty() => k,
-        _ => {
-            return (
-                StatusCode::BAD_REQUEST,
-                Json(serde_json::json!({"error": "missing key_id"})),
-            );
-        },
+        _ => return err(StatusCode::BAD_REQUEST, "missing key_id"),
     };
 
     let nonce = session::generate_nonce();
@@ -177,28 +154,17 @@ pub async fn authorize(Json(body): Json<AuthorizeReq>) -> impl IntoResponse {
             arr.copy_from_slice(&b);
             arr
         },
-        _ => {
-            return (
-                StatusCode::BAD_REQUEST,
-                Json(serde_json::json!({"error": "nonce must be 64 hex chars"})),
-            );
-        },
+        _ => return err(StatusCode::BAD_REQUEST, "nonce must be 64 hex chars"),
     };
 
     // 2. Verify challenge HMAC
     if !session::verify_challenge_hmac(&body.key_id, &nonce, body.expires_at, &body.hmac_token) {
-        return (
-            StatusCode::UNAUTHORIZED,
-            Json(serde_json::json!({"error": "invalid or expired challenge"})),
-        );
+        return err(StatusCode::UNAUTHORIZED, "invalid or expired challenge");
     }
 
     // 3. One-time nonce: reject replays within the challenge window.
     if !session::consume_nonce(&nonce, body.expires_at) {
-        return (
-            StatusCode::UNAUTHORIZED,
-            Json(serde_json::json!({"error": "nonce already used"})),
-        );
+        return err(StatusCode::UNAUTHORIZED, "nonce already used");
     }
 
     // 4. Session issuance is DISABLED until FALCON signature verification is wired.
@@ -246,12 +212,7 @@ pub async fn logout_all(
 ) -> impl IntoResponse {
     let token = match bearer_token(&headers) {
         Some(t) => t,
-        None => {
-            return (
-                StatusCode::UNAUTHORIZED,
-                Json(serde_json::json!({"error": "missing bearer session token"})),
-            );
-        },
+        None => return err(StatusCode::UNAUTHORIZED, "missing bearer session token"),
     };
 
     let mut conn = match crate::db::connect().await {
@@ -260,10 +221,7 @@ pub async fn logout_all(
             crate::log_error(crate::LogMsg::Auth {
                 detail: format!("logout-all: DB connect failed: {e}"),
             });
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::json!({"error": "internal error"})),
-            );
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "internal error");
         },
     };
 
@@ -277,19 +235,13 @@ pub async fn logout_all(
     {
         Ok(c) => c,
         Err(diesel::result::Error::NotFound) => {
-            return (
-                StatusCode::NOT_FOUND,
-                Json(serde_json::json!({"error": "key_id not found"})),
-            );
+            return err(StatusCode::NOT_FOUND, "key_id not found");
         },
         Err(e) => {
             crate::log_error(crate::LogMsg::Auth {
                 detail: format!("logout-all: DB select failed: {e}"),
             });
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::json!({"error": "internal error"})),
-            );
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "internal error");
         },
     };
 
@@ -298,10 +250,7 @@ pub async fn logout_all(
         session::parse_session_token(token, current_counter),
         Ok(s) if s.key_id == body.key_id
     ) {
-        return (
-            StatusCode::UNAUTHORIZED,
-            Json(serde_json::json!({"error": "invalid or expired session token"})),
-        );
+        return err(StatusCode::UNAUTHORIZED, "invalid or expired session token");
     }
 
     let result = update(tbl::table.filter(tbl::key_id.eq(&body.key_id)))
@@ -315,18 +264,12 @@ pub async fn logout_all(
             StatusCode::OK,
             Json(serde_json::json!({"nonce_counter": counter})),
         ),
-        Err(diesel::result::Error::NotFound) => (
-            StatusCode::NOT_FOUND,
-            Json(serde_json::json!({"error": "key_id not found"})),
-        ),
+        Err(diesel::result::Error::NotFound) => err(StatusCode::NOT_FOUND, "key_id not found"),
         Err(e) => {
             crate::log_error(crate::LogMsg::Auth {
                 detail: format!("logout-all: DB update failed: {e}"),
             });
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::json!({"error": "internal error"})),
-            )
+            err(StatusCode::INTERNAL_SERVER_ERROR, "internal error")
         },
     }
 }

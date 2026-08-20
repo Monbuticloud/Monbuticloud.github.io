@@ -11,10 +11,11 @@ Rust HTTP server serving portfolio pages, a Lazy SMP chess engine, and FALCON po
 
 | Path | Owner | Scope |
 |------|-------|-------|
-| `src/main.rs` | Server entry | Axum router, semaphore, resource monitor, log flusher, Rayon pool, auth routes |
+| `src/api/` | HTTP API | `mod.rs`, `chess.rs` (chess endpoint + pool/semaphore), `auth.rs` (auth routes), `html.rs` (static serving + cache) |
+| `src/main.rs` | Server entry | Axum router, logging (`LogMsg`/`LOG_BUFFER`), resource monitor, log flusher, panic hook |
 | `src/db.rs` | DB | `connect()` opens an `AsyncPgConnection` and sets `search_path TO public, auth` |
 | `src/schema.rs` | DB | Diesel `table!` macro for `auth.keys` with `schema_name = "auth"` |
-| `src/auth/` | Auth | `mod.rs`, `handlers.rs` (routes), `session.rs` (HMAC tokens) |
+| `src/auth/` | Auth | `session.rs` (HMAC tokens + challenge nonces); routes live in `src/api/auth.rs` |
 | `src/games/chess/main.rs` | Chess engine | Board state, move gen, Lazy SMP search, lock-free TT |
 | `src/tests/` | Tests | Mirror of `src/` — test files wired via `#[path]` |
 | `build.rs` | Build | Links Homebrew `libpq` on macOS (no env var needed) |
@@ -39,7 +40,7 @@ Rust HTTP server serving portfolio pages, a Lazy SMP chess engine, and FALCON po
 
 ## Work Guidance
 
-- FALCON verify on server is **stubbed** — `authorize` refuses session issuance (503) until `fn_dsa::verify()` is wired. The intended lookup→verify→issue flow is documented in a TODO in `auth/handlers.rs`.
+- FALCON verify on server is **stubbed** — `authorize` refuses session issuance (503) until `fn_dsa::verify()` is wired. The intended lookup→verify→issue flow is documented in a TODO in `src/api/auth.rs`.
 - `AUTH_HMAC_SECRET` is required (base64, at least 24 bytes). Server panics if unset.
 - `build.rs` links Homebrew `libpq` on macOS — no env vars needed for local builds.
 - Tests live in `src/tests/` as a mirror of `src/` (e.g. `src/tests/games/chess/main.rs`), wired via `#[path]`.

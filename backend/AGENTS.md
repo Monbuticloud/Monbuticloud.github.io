@@ -30,7 +30,7 @@ Rust HTTP server serving portfolio pages, a Lazy SMP chess engine, and FALCON po
 ## Local Contracts
 
 1. **No client-side connection pool** — PgDog is the pooler. Open/drop as needed.
-2. **Zero heap in search** — Piece lists are `[u8; 16]` arrays, stack-only. `mimalloc` global allocator.
+2. **Zero heap in search** — Board is `[Piece; 64]`, piece lists are `[Square; 16]` arrays (1-byte enums), stack-only. `mimalloc` global allocator.
 3. **Depth 1–15** — Invalid depth returns 400. Depth 13+ gated behind FALCON auth (not wired yet).
 4. **Stateless sessions** — HMAC token with `nonce_counter`. No session table. Challenge nonces are single-use (replay-protected); `logout-all` requires a valid session token.
 5. **Lazy SMP** — `rayon::scope` with `CHESS_POOL` (dedicated Rayon pool, 256KB stacks).

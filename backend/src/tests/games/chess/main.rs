@@ -15,18 +15,18 @@ fn uci_move(board: &Board, uci: &str) -> Move {
     let bytes = uci.as_bytes();
     let file = |c: u8| (c - b'a') as i8;
     let rank = |c: u8| (8 - (c - b'0')) as i8;
-    let from = (rank(bytes[1]) * 8 + file(bytes[0])) as u8;
-    let to = (rank(bytes[3]) * 8 + file(bytes[2])) as u8;
+    let from = Square::from_index((rank(bytes[1]) * 8 + file(bytes[0])) as u8);
+    let to = Square::from_index((rank(bytes[3]) * 8 + file(bytes[2])) as u8);
     let promotion = if bytes.len() > 4 {
         match bytes[4] {
-            b'q' => if board.side_to_move == Color::White { W_QUEEN } else { B_QUEEN },
-            b'r' => if board.side_to_move == Color::White { W_ROOK } else { B_ROOK },
-            b'b' => if board.side_to_move == Color::White { W_BISHOP } else { B_BISHOP },
-            b'n' => if board.side_to_move == Color::White { W_KNIGHT } else { B_KNIGHT },
-            _ => 0,
+            b'q' => if board.side_to_move == Color::White { Piece::WQueen } else { Piece::BQueen },
+            b'r' => if board.side_to_move == Color::White { Piece::WRook } else { Piece::BRook },
+            b'b' => if board.side_to_move == Color::White { Piece::WBishop } else { Piece::BBishop },
+            b'n' => if board.side_to_move == Color::White { Piece::WKnight } else { Piece::BKnight },
+            _ => Piece::Empty,
         }
     } else {
-        0
+        Piece::Empty
     };
     Move { from, to, promotion }
 }
@@ -52,13 +52,13 @@ fn start_position_piece_lists() {
     for i in 0..6 {
         for j in 0..b.piece_count[i] {
             let sq = b.piece_list[i][j as usize];
-            assert!(b.board[sq as usize] > 0, "white list {} sq {} has {} (not white)", i, sq, b.board[sq as usize]);
+            assert!(b.board[sq.index()].is_white(), "white list {} sq {} has {} (not white)", i, sq, b.board[sq.index()]);
         }
     }
     for i in 6..12 {
         for j in 0..b.piece_count[i] {
             let sq = b.piece_list[i][j as usize];
-            assert!(b.board[sq as usize] < 0, "black list {} sq {} has {} (not black)", i, sq, b.board[sq as usize]);
+            assert!(b.board[sq.index()].is_black(), "black list {} sq {} has {} (not black)", i, sq, b.board[sq.index()]);
         }
     }
 }
@@ -71,8 +71,8 @@ fn start_position_white_moves() {
     // None should be from a black piece square
     for i in 0..moves.count {
         let mv = moves.moves[i];
-        let piece = b.board[mv.from as usize];
-        assert!(piece > 0, "move {}: from {} ({}) not white piece (found {})", i, square_name(mv.from), mv.from, piece);
+        let piece = b.board[mv.from.index()];
+        assert!(piece.is_white(), "move {}: from {} ({}) not white piece (found {})", i, square_name(mv.from), mv.from, piece);
     }
 }
 
@@ -81,10 +81,10 @@ fn depth_1_best_move() {
     let b = board_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
     // Search must return a legal white move
     let mut board = b.clone();
-    let mut killers = [[Move { from: 0, to: 0, promotion: 0 }; 2]; MAX_PLY];
+    let mut killers = [[Move::null(); 2]; MAX_PLY];
     let (_score, best) = search(&mut board, 1, -30000, 30000, &mut killers, 0);
-    let piece = b.board[best.from as usize];
-    assert!(piece > 0, "best move from {} ({}) not white (found {})", square_name(best.from), best.from, piece);
+    let piece = b.board[best.from.index()];
+    assert!(piece.is_white(), "best move from {} ({}) not white (found {})", square_name(best.from), best.from, piece);
 }
 
 #[test]
@@ -98,7 +98,7 @@ fn best_move_white_start() {
     let from_sq = ((7 - from_rank) * 8 + from_file) as usize;
     // Must be a white piece
     let b = board_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
-    assert!(b.board[from_sq] > 0, "best move {} from sq {} has {} (not white)", mv, from_sq, b.board[from_sq]);
+    assert!(b.board[from_sq].is_white(), "best move {} from sq {} has {} (not white)", mv, from_sq, b.board[from_sq]);
 }
 
 #[test]
@@ -119,13 +119,13 @@ fn best_move_deep_search() {
     for depth in 1..=6 {
         let b = board_fen(fen);
         let mut local_board = b.clone();
-        let mut killers = [[Move { from: 0, to: 0, promotion: 0 }; 2]; MAX_PLY];
+        let mut killers = [[Move::null(); 2]; MAX_PLY];
         for d in 1..=depth {
             let (_score, mv) = search(&mut local_board, d, -30000, 30000, &mut killers, 0);
-            let is_valid = mv.from != mv.to || mv.promotion != 0;
+            let is_valid = mv.from != mv.to || mv.promotion != Piece::Empty;
             if is_valid {
-                let piece = b.board[mv.from as usize];
-                assert!(piece < 0,
+                let piece = b.board[mv.from.index()];
+                assert!(piece.is_black(),
                     "depth {}: move {} from sq {} has {} (not black piece)",
                     d, square_name(mv.from)+&square_name(mv.to), mv.from, piece);
             }
@@ -143,10 +143,10 @@ fn validate_lists(b: &Board) {
         let count = b.piece_count[idx];
         for i in 0..count {
             let sq = b.piece_list[idx][i as usize];
-            let expected = if idx < 6 { (idx + 1) as i8 } else { -((idx - 5) as i8) };
-            assert_eq!(b.board[sq as usize], expected,
+            let expected = Piece::from_i8(if idx < 6 { (idx + 1) as i8 } else { -((idx - 5) as i8) });
+            assert_eq!(b.board[sq.index()], expected,
                 "list[{}][{}] = sq {} has {} on board, expected {}",
-                idx, i, sq, b.board[sq as usize], expected);
+                idx, i, sq, b.board[sq.index()], expected);
         }
     }
 }
@@ -161,7 +161,7 @@ fn best_move_single_threaded() {
         let from_rank = (mv.as_bytes()[1] - b'1') as i8;
         let from_sq = ((7 - from_rank) * 8 + from_file) as usize;
         let b = board_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
-        assert!(b.board[from_sq] > 0,
+        assert!(b.board[from_sq].is_white(),
             "depth {}: best move {} from sq {} has {} (not white)",
              depth, mv, from_sq, b.board[from_sq]);
     }
@@ -174,7 +174,7 @@ fn search_restores_board() {
     validate_lists(&board);
 
     let mut b = board.clone();
-    let mut killers = [[Move { from: 0, to: 0, promotion: 0 }; 2]; MAX_PLY];
+    let mut killers = [[Move::null(); 2]; MAX_PLY];
     let (_score, _mv) = search(&mut b, 1, -30000, 30000, &mut killers, 0);
 
     // After search depth 1, board should be restored
@@ -202,7 +202,7 @@ fn search_depth3_restores_board() {
     validate_lists(&board);
 
     let mut b = board.clone();
-    let mut killers = [[Move { from: 0, to: 0, promotion: 0 }; 2]; MAX_PLY];
+    let mut killers = [[Move::null(); 2]; MAX_PLY];
     let (_score, _mv) = search(&mut b, 3, -30000, 30000, &mut killers, 0);
 
     assert_eq!(b.hash, hash_before, "hash changed after depth 3 search");
@@ -218,7 +218,7 @@ fn iterative_deepening_restores() {
     let board = board_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
     let hash_before = board.hash;
     let mut b = board.clone();
-    let mut killers = [[Move { from: 0, to: 0, promotion: 0 }; 2]; MAX_PLY];
+    let mut killers = [[Move::null(); 2]; MAX_PLY];
 
     for d in 1..=3 {
         let (_score, _mv) = search(&mut b, d, -30000, 30000, &mut killers, 0);

@@ -26,6 +26,7 @@ Rust HTTP server serving portfolio pages, a Lazy SMP chess engine, and FALCON po
 | `nginx/` | Infra | Nginx reverse proxy config |
 | `static/` | Frontend | HTML/CSS/JS, portfolio pages, auth tool |
 | `docs/` | Docs | Auth protocol spec |
+| `docs/Todo/` | Docs | Todo tracking system (Guide.md rules; todo.md open, complete.md done) |
 
 ## Local Contracts
 
@@ -60,6 +61,8 @@ Rust HTTP server serving portfolio pages, a Lazy SMP chess engine, and FALCON po
 
 ## Child DOX Index
 
-No children yet. Candidates:
+- `docs/Todo/AGENTS.md` — file-based todo tracking system (Guide.md, todo.md, complete.md)
+
+Candidates:
 - `crates/falcon-wasm/AGENTS.md` — for the WASM crate build pipeline
 - `src/auth/AGENTS.md` — if auth logic warrants its own contract

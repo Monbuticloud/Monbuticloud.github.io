@@ -2,7 +2,7 @@
 
 use axum::{
     extract::Query,
-    http::{HeaderMap, StatusCode, header},
+    http::{HeaderMap, StatusCode},
     response::IntoResponse,
     Json,
 };
@@ -22,6 +22,8 @@ use std::collections::HashMap;
 
 use crate::auth::session;
 use crate::schema::auth::keys as tbl;
+
+use super::bearer_token;
 
 // ── Request types ────────────────────────────────────────────────
 
@@ -231,12 +233,6 @@ pub async fn authorize(Json(body): Json<AuthorizeReq>) -> impl IntoResponse {
             "expires_at": expiry,
         })),
     )
-}
-
-/// Extract a "Bearer <token>" from the Authorization header.
-fn bearer_token(headers: &HeaderMap) -> Option<&str> {
-    let auth = headers.get(header::AUTHORIZATION)?.to_str().ok()?;
-    auth.strip_prefix("Bearer ").map(str::trim).filter(|t| !t.is_empty())
 }
 
 /// POST /api/auth/logout-all — bump nonce_counter, kill all sessions.

@@ -133,6 +133,16 @@ pub fn parse_session_token(token: &str, nonce_counter: i64) -> Result<SessionDat
     })
 }
 
+/// Extract the plaintext key_id from a session token WITHOUT verifying it.
+/// Needed because session HMAC binds to the DB-stored nonce_counter, which
+/// can only be looked up after parsing key_id. The result is UNTRUSTED —
+/// callers must still run `parse_session_token` against the fetched counter.
+pub fn peek_key_id(token: &str) -> Option<String> {
+    let key_id_hex = token.split('.').next()?;
+    let bytes = hex::decode(key_id_hex).ok()?;
+    String::from_utf8(bytes).ok()
+}
+
 // ── Helpers ──────────────────────────────────────────────────────
 
 /// Generate a fresh 32-byte challenge nonce.
@@ -175,5 +185,21 @@ mod tests {
         let expiry = chrono::Utc::now().timestamp() + 60;
         assert!(consume_nonce(&nonce, expiry), "first use must succeed");
         assert!(!consume_nonce(&nonce, expiry), "replay must be rejected");
+    }
+
+    #[test]
+    fn peek_key_id_roundtrip_and_garbage() {
+        // Hand-built token: avoids build_session_token, whose HMAC_KEY
+        // lazy-static would panic without AUTH_HMAC_SECRET in test runs.
+        let token = format!(
+            "{}.{}.{}.{}",
+            hex::encode("laptop"),
+            hex::encode([0u8; 16]),
+            hex::encode(0i64.to_be_bytes()),
+            "ab".repeat(32),
+        );
+        assert_eq!(peek_key_id(&token).as_deref(), Some("laptop"));
+        assert_eq!(peek_key_id("not-a-token"), None);
+        assert_eq!(peek_key_id("zz.zz.zz.zz"), None); // invalid hex
     }
 }

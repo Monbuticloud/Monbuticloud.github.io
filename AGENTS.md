@@ -104,13 +104,13 @@ Monorepo for Monbuticloud's personal portfolio site and projects.
 
 1. **Backend**: Run with `docker compose up --build` from `backend/`. Depends on Docker Desktop, `wasm-bindgen` + `wasm-opt` for falcon-wasm.
 2. **Frontend**: Static HTML stub. Once built, will deploy from `frontend/` to GitHub Pages.
-3. **Auth**: FALCON pub key is public. Private key generated client-side, never uploaded. HMAC stateless sessions with nonce_counter revocation.
-4. **Chess**: Depth 1–15 (13–15 gated behind FALCON auth, not wired yet). Lazy SMP via `rayon::scope`. Semaphore backpressure → 503.
+3. **Auth**: FALCON (FN-DSA-1024) signatures verified server-side via `falcon-rs`; registration restricted to 1024-param pub keys. Private key generated client-side, never uploaded. HMAC stateless sessions with nonce_counter revocation.
+4. **Chess**: Depth 1–15; depth 13–15 require a Bearer session with CAP_DEEP_SEARCH (enforced server-side). Lazy SMP via `rayon::scope`. Semaphore backpressure → 503.
 
 ## Work Guidance
 
 - Keep session tokens stateless (HMAC, no session table)
-- FALCON verify is currently stubbed — wire `fn_dsa::verify()` when ready
+- FALCON verify is wired via `falcon-rs` — FN-DSA-1024 public keys only
 - `.env` files are gitignored; `.env.example` is the template
 - PgDog is the pooler — no client-side connection pool
 - Cargo workspace: root `backend/Cargo.toml` + child `backend/crates/falcon-wasm/`

@@ -62,24 +62,14 @@ Sorted by priority (P) descending. See `Guide.md` for tag rules.
 - Summary: `/api/auth/keys` accepts unlimited registrations (open by design, refuses overwrite). No rate limiting → DB flooding. Low stakes today (authorize disabled), but add basic rate limiting before FALCON goes live.
 - Status: open
 
-## [CR-007] LOG_DEPTH undercounts request logs
+## [CR-011] Signup MITM unmitigated — no out-of-band trust anchor
 
-- P: 3
-- B: 1
-- Since: 2026-08-22
-- Since commit: f9b2955
-- File: backend/src/main.rs:331
-- Summary: `track_request` pushes directly into `LOG_BUFFER` instead of calling `log_info`, so `LOG_DEPTH` never increments for request logs. The >10k early-flush trigger undercounts. Use `log_info(LogMsg::Request{..})`.
-- Status: open
-
-## [CR-008] Engine mate scores not ply-adjusted in TT
-
-- P: 2
-- B: 3
-- Since: 2026-08-22
-- Since commit: f9b2955
-- File: backend/src/games/chess/main.rs:2497, 2678-2693
-- Summary: `search` returns `-20000 + board.fullmove_number` and TT stores raw scores with no ply adjustment. Mate distances get polluted across TT probes (stored relative to fullmove number, not distance-from-root), degrading mate-finding at high depths. Cosmetic for a portfolio engine.
+- P: 5
+- B: 0
+- Since: 2026-08-24
+- Since commit: b3cf80f
+- File: backend/docs/auth-signing.md
+- Summary: First-use key registration trusts whatever the site serves (WASM or .mhtml), so a proxying attacker can steal generated keypairs. Universal to all credential systems; real fix needs an out-of-band distribution channel for the signing tool. Doc corrected to state this honestly.
 - Status: open
 
 ## [CR-009] Repo hygiene: junk/untracked files
@@ -92,6 +82,16 @@ Sorted by priority (P) descending. See `Guide.md` for tag rules.
 - Summary: Stray files including a 128K `backend/v` (looks like shell-redirection debris) and tracked `.DS_Store`s. Delete/gitignore; keep the tree clean.
 - Status: open
 
+## [CR-007] LOG_DEPTH undercounts request logs
+
+- P: 3
+- B: 1
+- Since: 2026-08-22
+- Since commit: f9b2955
+- File: backend/src/main.rs:331
+- Summary: `track_request` pushes directly into `LOG_BUFFER` instead of calling `log_info`, so `LOG_DEPTH` never increments for request logs. The >10k early-flush trigger undercounts. Use `log_info(LogMsg::Request{..})`.
+- Status: open
+
 ## [CR-010] RwLock unwrap can cascade under poisoned lock
 
 - P: 3
@@ -100,4 +100,14 @@ Sorted by priority (P) descending. See `Guide.md` for tag rules.
 - Since commit: f9b2955
 - File: backend/src/api/html.rs:29, 51
 - Summary: `FILE_CACHE.read().unwrap()` / `.write().unwrap()` — a poisoned lock (writer panicked while holding it) cascades into handler panics. Low likelihood, but use `unwrap_or_else(|p| p.into_inner())` to recover instead of panicking.
+- Status: open
+
+## [CR-008] Engine mate scores not ply-adjusted in TT
+
+- P: 2
+- B: 3
+- Since: 2026-08-22
+- Since commit: f9b2955
+- File: backend/src/games/chess/main.rs:2497, 2678-2693
+- Summary: `search` returns `-20000 + board.fullmove_number` and TT stores raw scores with no ply adjustment. Mate distances get polluted across TT probes (stored relative to fullmove number, not distance-from-root), degrading mate-finding at high depths. Cosmetic for a portfolio engine.
 - Status: open

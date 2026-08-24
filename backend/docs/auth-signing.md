@@ -14,7 +14,7 @@ session = stateless (HMAC-bound to key_id + nonce_counter)
 
 ## Key Generation (Client-side WASM)
 
-When a user signs up, the browser generates a FALCON-512 keypair in WASM:
+When a user signs up, the browser generates a FALCON-1024 keypair in WASM:
 
 ```
 Keypair = FALCON.GenerateKeypair()
@@ -63,7 +63,7 @@ If encrypted, the WASM prompts for a passphrase before signing. Without it, the 
 POST /api/auth/keys
 {
     "key_id": "laptop",       // user-chosen identifier
-    "pub_key": "5v8yXz..."    // FALCON-512 public key (base64)
+    "pub_key": "5v8yXz..."    // FALCON-1024 public key (base64)
 }
 → 201 { "key_id": "laptop" }
 ```
@@ -103,7 +103,7 @@ POST /api/auth/authorize
     "key_id": "laptop",
     "nonce": "a1b2c3...",
     "hmac_token": "b7c8d9...",
-    "falcon_sig": "9z8y7x..."   // FALCON-512 signature over nonce (base64)
+    "falcon_sig": "9z8y7x..."   // FALCON-1024 signature over nonce (base64)
 }
 → 200
 {
@@ -201,7 +201,7 @@ UPDATE auth.keys SET nonce_counter = nonce_counter + 1 WHERE key_id = 'laptop';
 
 ## Offline Signing (.mhtml)
 
-For users who want maximum security against phishing, a self-contained `.mhtml` file handles signing offline:
+For users who want the signing step isolated from their browsing context, a self-contained `.mhtml` file handles it offline:
 
 **homepage-auth.mhtml** (single file, served once):
 
@@ -235,17 +235,18 @@ For users who want maximum security against phishing, a self-contained `.mhtml` 
 
 ### Security Properties
 
-- **No network calls**: The .mhtml is loaded from `file://`. Any attempt to `fetch()` data is visible in the dev tools and trivially auditable.
-- **Manual copy/paste air gap**: The challenge goes in, the signature comes out. No automated channel for exfiltration.
+- **No network calls**: While running, the .mhtml is loaded from `file://`. Any attempt to `fetch()` data is visible in the dev tools and trivially auditable.
+- **Manual copy/paste isolation**: The challenge goes in, the signature comes out. No automated channel for exfiltration from the page context.
 - **Key never uploaded**: The private key is read into WASM memory via a local file input. Never POST'd.
-- **Verifiable source**: The .mhtml can be checksummed and compared to the published version.
-- **Phishing resistance**: A fake site can't serve the real .mhtml. A fake .mhtml can't replicate the WASM without rebuilding it (and that version won't match the checksum).
+
+These properties hold against **passive phishing pages**: there is no password field to phish, no credentials typed into the site, and signing runs isolated from the browsing context. They do **not** hold against an active proxy on first download — the .mhtml itself is served by the same site the attacker may be proxying, so the attacker can tamper with it and with any checksum published beside it (see [The One Fail-Case](#the-one-fail-case-signup-mitm)). "Verifiable source" only works if you already hold a trusted copy of the hash from somewhere other than the site — there is no such out-of-band channel today.
 
 ### Limitations
 
 - Copy/paste across windows is friction
 - WASM from `file://` may need browser flag adjustments (or serve the .mhtml once from the server, then save locally)
 - Does not protect against a compromised machine (keylogger, clipboard snooper)
+- Does not protect against an active proxy tampering with the .mhtml at download time — no independent distribution channel exists
 
 ---
 
@@ -260,7 +261,7 @@ CREATE TABLE auth.keys (
     id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
     key_id          TEXT        NOT NULL UNIQUE,
     label           TEXT        NOT NULL DEFAULT '',
-    pub_key         BYTEA       NOT NULL,          -- raw FALCON-512 public key
+    pub_key         BYTEA       NOT NULL,          -- raw FALCON-1024 public key
     capabilities    SMALLINT    NOT NULL DEFAULT 15,-- access tier / bitmask
     is_active       BOOLEAN     NOT NULL DEFAULT true,
     nonce_counter   BIGINT      NOT NULL DEFAULT 0,-- ⬆ increment = logout all
@@ -280,7 +281,7 @@ CREATE TABLE auth.keys (
 
 ## Phishing Resistance
 
-This auth system was designed specifically to minimise phishing surface. Here's how each layer addresses a distinct phishing vector:
+This auth system was designed to minimise phishing surface against **passive phishing pages**. Here's how each layer addresses a distinct vector — and where the limits are against an active proxy.
 
 ### No Password Field
 
@@ -288,7 +289,7 @@ There is no `<input type="password">`. A phisher can't build a fake login form b
 
 ### The .mhtml Air Gap
 
-The signing step happens in a **separate application window** that never touches the network:
+The signing step can run in a **separate application window** that doesn't touch the network while it runs:
 
 ```
 Phishing page (attacker)              .mhtml (user's local file)
@@ -299,15 +300,17 @@ User copies challenge ──────────→  Pasted into .mhtml
 User pastes signature ←──────────  Copied from .mhtml
 ```
 
-The phisher can't modify the .mhtml because:
+The air gap covers only the signing step itself. It does not authenticate the tool doing the signing: the .mhtml is downloaded from the same site an attacker may be proxying, so the attacker can tamper with the .mhtml — and with any checksum published beside it — exactly as they can tamper with the signup WASM:
 
-- It's a local `file://` — the attacker doesn't control it
-- Even if they serve their own fake .mhtml, the real one has a known checksum
-- The WASM inside the real .mhtml refuses to run on a different domain
+- It's a local `file://` once saved — but nothing guarantees the file the user saved is the real one
+- The published checksum lives on the same proxied site — verifying against it proves nothing under MITM
+- There is no second channel (OS package manager, app store, independently pinned hash) anywhere in this flow
+
+Against an active proxy at first download, the .mhtml changes _where_ signing happens, not _who_ delivered the signing code.
 
 ### Manual Copy/Paste
 
-The challenge and signature cross the window boundary via **user-managed copy/paste**. There is no automated channel — no `postMessage`, no `fetch`, no `WebSocket`. The user visually inspects the challenge before signing. A phisher can't silently extract a signature without the user noticing.
+The challenge and signature cross the window boundary via **user-managed copy/paste**. There is no automated channel — no `postMessage`, no `fetch`, no `WebSocket`. This keeps the signing tool isolated from the browsing context and prevents silent scripted extraction of signatures. It does not authenticate anything: the user cannot distinguish a genuine challenge from one crafted by a proxying attacker, and if the signing code itself was tampered with at download time, manual transport makes no difference.
 
 ### Key Never Uploaded
 
@@ -374,30 +377,18 @@ The WASM served during signup is the trust root. If it's compromised, the genera
 
 | Mitigation                                   | What it prevents                                                            | Bypass                                                 |
 | -------------------------------------------- | --------------------------------------------------------------------------- | ------------------------------------------------------ |
-| **Generate key offline first**               | User generates keypair via locally-verified .mhtml before visiting the site | High friction; user must obtain .mhtml securely        |
-| **SRI + pinning**                            | WASM integrity is checked against a known hash                              | First visit has no pin                                 |
+| **Generate key offline first**               | User generates keypair via .mhtml before visiting the site                  | Only helps if the .mhtml itself was obtained through an independent channel |
+| **SRI + pinning**                            | WASM integrity is checked against a known hash                              | First visit has no pin                              |
 | **Key verification handshake**               | After registration, user signs a challenge to prove key ownership           | Doesn't help — both user and attacker have the key     |
 | **Logout all at end of session**             | Limits window of compromise                                                 | Attacker still has the key file                        |
 | **Passphrase encryption**                    | Key file is useless without the passphrase                                  | Passphrase entered into compromised WASM = also stolen |
-| **Generate key in .mhtml, register via API** | WASM from trusted local source, not the website                             | Works — see below                                      |
+| **Generate key in .mhtml, register via API** | Moves signing out of the site's browsing context                            | Doesn't stop MITM — the .mhtml comes from the same proxied channel (see below) |
 
-### The Real Fix: Generate Offline, Register via API
+### Why Offline Generation Alone Doesn't Fix It
 
-The only true mitigation is to **separate key generation from the website** entirely:
+Generating the keypair in the .mhtml instead of the website moves where signing happens — but the .mhtml is downloaded from the same site an attacker may be proxying. The attacker can tamper with the .mhtml exactly like the signup WASM, and with any checksum published beside it, because there is no out-of-band channel anywhere in this loop. The trust root still lands on the network.
 
-```
-1. Download homepage-auth.mhtml (from a trusted channel, or verify checksum)
-2. Open .mhtml offline → click "Generate Key"
-3. .mhtml creates keypair, saves homepage-key.priv, shows pub_key
-4. Visit home page → paste pub_key into registration form
-5. .mhtml never fetched from the network → WASM can't be tampered with
-```
-
-This moves the trust root from the network to the file the user explicitly saves. An attacker would need to compromise the download channel twice (mhtml + key file) instead of once.
-
-### Broader Context
-
-Signup MITM is a fundamental problem with _every_ auth system:
+This failure mode is not unique to FALCON — every credential system is vulnerable to a proxying attacker at first-use/first-registration time:
 
 | System                   | Signup attack                                                                       |
 | ------------------------ | ----------------------------------------------------------------------------------- |
@@ -405,9 +396,16 @@ Signup MITM is a fundamental problem with _every_ auth system:
 | OAuth (Google/GitHub)    | Attacker redirects to fake OAuth consent screen                                     |
 | WebAuthn (hardware key)  | Attacker registers their own key if they control the page                           |
 | **FALCON (this system)** | Attacker steals generated keypair                                                   |
-| SSH key                  | Same problem — but SSH keys are generated offline (OpenSSH CLI), not in the browser |
+| SSH key                  | Same problem — mitigated only because OpenSSH ships via OS package managers, an independent channel |
 
-This system is no worse than any other. The offline generation fix mirrors how SSH keys work: generate locally with `ssh-keygen`, then upload the pub key. The .mhtml is our `ssh-keygen`.
+### What a Real Fix Requires
+
+A genuinely independent trust anchor for the signing tool, for example:
+
+- Second-channel distribution (OS package manager, app store, physical media)
+- A pinned hash obtained from infrastructure independent of the site itself
+
+Neither exists in the current deployment. Until one does, **signup MITM is unmitigated** — accepted residual risk, tracked as CR-011 in `docs/Todo/todo.md`.
 
 ---
 
@@ -418,8 +416,8 @@ This system is no worse than any other. The offline generation fix mirrors how S
 | Server DB dumped        | Only pub keys leaked — public by definition                    |
 | Forged challenge token  | HMAC verification (attacker doesn't have `AUTH_HMAC_SECRET`)   |
 | Replay attack           | Per-request nonces in challenge; session expiry; nonce_counter |
-| Phished private key     | Passphrase encryption (Argon2id + AES-GCM); .mhtml air gap     |
-| Quantum computer        | FALCON-512 is NIST PQC standard — quantum-safe                 |
+| Phished private key     | Passphrase encryption (Argon2id + AES-GCM); .mhtml isolates signing — but not against a proxying attacker at first download (see Signup MITM) |
+| Quantum computer        | FALCON-1024 is NIST PQC standard — quantum-safe                 |
 | Session token stolen    | Tied to nonce_counter — logout all kills it instantly          |
 | Brute force HMAC secret | Server never reveals HMAC failure vs key failure (same error)  |
-| WASM tampering          | .mhtml checksum verification; pinning to known hash            |
+| WASM tampering          | Checksum verification exists, but the checksum shares the delivery channel — no independent trust anchor today (CR-011) |

@@ -26,11 +26,13 @@
 ### Task 1: `falcon-rs` dependency + `falcon_verify()`
 
 **Files:**
+
 - Modify: `backend/Cargo.toml` (dependencies section)
 - Create: `backend/src/auth/falcon.rs`
 - Modify: `backend/src/auth/mod.rs`
 
 **Interfaces:**
+
 - Produces: `crate::auth::falcon::falcon_verify(pub_key: &[u8], message: &[u8], sig: &[u8]) -> bool` and `pub const FALCON_PUB_KEY_LEN: usize = 1793` (used by Tasks 2–3).
 
 - [ ] **Step 1: Add dependency**
@@ -134,9 +136,11 @@ git commit -m "feat(auth): add falcon-rs dep and FALCON-1024 verify function"
 ### Task 2: Registration tightening (1793-byte keys)
 
 **Files:**
+
 - Modify: `backend/src/api/auth.rs:81-88` (`register_key` pub_key decode block)
 
 **Interfaces:**
+
 - Consumes: `crate::auth::falcon::FALCON_PUB_KEY_LEN` (Task 1).
 
 - [ ] **Step 1: Replace the size check**
@@ -187,9 +191,11 @@ git commit -m "feat(auth): restrict registration to FALCON-1024 public keys"
 ### Task 3: Wire `authorize` (lookup → verify → consume → issue)
 
 **Files:**
+
 - Modify: `backend/src/api/auth.rs` (`authorize`, remove dead-code attrs on `AuthorizeReq.falcon_sig` and `KeyRow`)
 
 **Interfaces:**
+
 - Consumes: `falcon_verify` (Task 1); existing `session::{verify_challenge_hmac, consume_nonce, build_session_token, session_expiry}`; existing `KeyRow`.
 
 - [ ] **Step 1: Rewrite `authorize`**
@@ -283,6 +289,7 @@ pub async fn authorize(Json(body): Json<AuthorizeReq>) -> impl IntoResponse {
 ```
 
 Also delete these two attributes (no longer dead):
+
 - `#[allow(dead_code)]` above `pub falcon_sig` in `AuthorizeReq`
 - `#[allow(dead_code)]` above `struct KeyRow` (keep the comment removed too)
 
@@ -300,6 +307,7 @@ git commit -m "feat(auth): wire FALCON verification and session issuance into au
 ### Task 4: Chess depth gating (Bearer session + capability bit)
 
 **Files:**
+
 - Modify: `backend/src/auth/session.rs` (add `peek_key_id`)
 - Modify: `backend/src/auth/mod.rs` (add `CAP_DEEP_SEARCH`)
 - Modify: `backend/src/api/mod.rs` (receive `bearer_token` from `api/auth.rs`)
@@ -307,6 +315,7 @@ git commit -m "feat(auth): wire FALCON verification and session issuance into au
 - Modify: `backend/src/api/chess.rs` (gate depth ≥ 13)
 
 **Interfaces:**
+
 - Consumes: `session::parse_session_token(token, nonce_counter) -> Result<SessionData, &'static str>` (exists).
 - Produces: `session::peek_key_id(token: &str) -> Option<String>`; `crate::auth::CAP_DEEP_SEARCH: i16`; `crate::api::bearer_token(&HeaderMap) -> Option<&str>`.
 
@@ -480,6 +489,7 @@ git commit -m "feat(chess): gate depth 13-15 behind FALCON sessions with CAP_DEE
 ### Task 5: Doc correction + residual-risk todo + DOX pass
 
 **Files:**
+
 - Modify: `backend/docs/auth-signing.md` (Offline Signing §Security Properties, Phishing Resistance §The .mhtml Air Gap + §Manual Copy/Paste framing, The One Fail-Case §The Real Fix)
 - Modify: `backend/docs/Todo/todo.md` (new CR-011)
 - Modify: `backend/AGENTS.md` + root `AGENTS.md` (DOX pass)
@@ -489,7 +499,7 @@ git commit -m "feat(chess): gate depth 13-15 behind FALCON sessions with CAP_DEE
 Replace the "Real Fix: Generate Offline, Register via API" framing and the .mhtml "Security Properties"/"Phishing Resistance" claims with honest text. Core points to land (edit surrounding prose as needed):
 
 - The .mhtml is downloaded from the same site an attacker may be proxying — the attacker can tamper with it and any checksum published beside it. There is no out-of-band channel anywhere in the loop.
-- Signup MITM is therefore **unmitigated** in the current deployment — and this is not unique to FALCON: every credential system (passwords, OAuth, WebAuthn, SSH-key upload) is vulnerable to a proxying attacker at first-use/first-registration time. The .mhtml changes *where* signing happens, not *who* delivered the signing code.
+- Signup MITM is therefore **unmitigated** in the current deployment — and this is not unique to FALCON: every credential system (passwords, OAuth, WebAuthn, SSH-key upload) is vulnerable to a proxying attacker at first-use/first-registration time. The .mhtml changes _where_ signing happens, not _who_ delivered the signing code.
 - Residual value: no password field to phish, credentials never typed into the site, signing isolated from the browsing context. These hold against passive phishing pages, NOT against an active proxy on first download.
 - A real fix requires a genuinely independent trust anchor (second-channel distribution, pinned hash from independent infrastructure) — currently absent.
 

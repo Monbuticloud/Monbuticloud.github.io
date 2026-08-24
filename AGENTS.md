@@ -121,7 +121,7 @@ Monorepo for Monbuticloud's personal portfolio site and projects.
 - `cargo check` — type checks the backend
 - `cargo test` — runs backend tests
 - `cargo clippy` — lints
-- `cargo deny check` — dependency audit (config at `backend/.config/deny.toml`)
+- `cargo deny check` — dependency audit (config at `backend/deny.toml`, cargo-deny 0.19 schema)
 - `cargo nextest run` — faster test runner (config at `backend/.config/nextest.toml`)
 - `wasm-opt` + `wasm-bindgen` for falcon-wasm builds (`crates/falcon-wasm/build.sh`)
 

@@ -82,8 +82,14 @@ pub async fn register_key(Json(body): Json<RegisterKeyReq>) -> impl IntoResponse
         &base64::engine::general_purpose::STANDARD,
         &body.pub_key,
     ) {
-        Ok(b) if b.len() <= 4096 => b,
-        Ok(_) => return err(StatusCode::BAD_REQUEST, "pub_key too large (max 4096 bytes)"),
+        // FN-DSA-1024 only — any other size could register but never verify.
+        Ok(b) if b.len() == crate::auth::falcon::FALCON_PUB_KEY_LEN => b,
+        Ok(_) => {
+            return err(
+                StatusCode::BAD_REQUEST,
+                "pub_key must be a FALCON-1024 public key (1793 bytes)",
+            )
+        },
         Err(_) => return err(StatusCode::BAD_REQUEST, "pub_key must be valid base64"),
     };
 

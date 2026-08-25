@@ -15,7 +15,7 @@ Rust HTTP server serving portfolio pages, a Lazy SMP chess engine, and FALCON po
 | `src/main.rs` | Server entry | Axum router, logging (`LogMsg`/`LOG_BUFFER`), resource monitor, log flusher, panic hook |
 | `src/db.rs` | DB | `connect()` opens an `AsyncPgConnection` and sets `search_path TO public, auth` |
 | `src/schema.rs` | DB | Diesel `table!` macro for `auth.keys` with `schema_name = "auth"` |
-| `src/auth/` | Auth | `session.rs` (HMAC tokens + challenge nonces); routes live in `src/api/auth.rs` |
+| `src/auth/` | Auth | `session.rs` (HMAC tokens + challenge nonces), `falcon.rs` (FALCON-1024 verify); routes live in `src/api/auth.rs` |
 | `src/games/chess/main.rs` | Chess engine | Board state, move gen, Lazy SMP search, lock-free TT |
 | `src/tests/` | Tests | Mirror of `src/` — test files wired via `#[path]` |
 | `build.rs` | Build | Links Homebrew `libpq` on macOS (no env var needed) |
@@ -25,14 +25,16 @@ Rust HTTP server serving portfolio pages, a Lazy SMP chess engine, and FALCON po
 | `Dockerfile` | Infra | Multi-stage Rust build + UPX + scratch image |
 | `nginx/` | Infra | Nginx reverse proxy config |
 | `static/` | Frontend | HTML/CSS/JS, portfolio pages, auth tool |
-| `docs/` | Docs | Auth protocol spec |
+| `docs/` | Docs | Auth protocol spec (`auth-signing.md`) |
+| `docs/specs/` | Docs | Feature design specs (SDD design docs) |
+| `docs/plans/` | Docs | Implementation plans (SDD task briefs) |
 | `docs/Todo/` | Docs | Todo tracking system (Guide.md rules; todo.md open, complete.md done) |
 
 ## Local Contracts
 
 1. **No client-side connection pool** — PgDog is the pooler. Open/drop as needed.
 2. **Zero heap in search** — Board is `[Piece; 64]`, piece lists are `[Square; 16]` arrays (1-byte enums), stack-only. `mimalloc` global allocator.
-3. **Depth 1–15** — Invalid depth returns 400. Depth 13+ gated behind FALCON auth (not wired yet).
+3. **Depth 1–15** — Invalid depth returns 400. Depth 13–15 require a valid FALCON session with CAP_DEEP_SEARCH (enforced server-side).
 4. **Stateless sessions** — HMAC token with `nonce_counter`. No session table. Challenge nonces are single-use (replay-protected); `logout-all` requires a valid session token.
 5. **Lazy SMP** — `rayon::scope` with `CHESS_POOL` (dedicated Rayon pool, 256KB stacks).
 6. **Semaphore backpressure** — `CHESS_SEMAPHORE`, `try_acquire` → 503 immediately.
@@ -41,7 +43,8 @@ Rust HTTP server serving portfolio pages, a Lazy SMP chess engine, and FALCON po
 
 ## Work Guidance
 
-- FALCON verify on server is **stubbed** — `authorize` refuses session issuance (503) until `fn_dsa::verify()` is wired. The intended lookup→verify→issue flow is documented in a TODO in `src/api/auth.rs`.
+- FALCON verify is wired via `falcon-rs` — FN-DSA-1024 public keys only. `authorize` verifies the signature over the nonce before issuing a session; registration rejects non-1024-param keys.
+- Known residual risk: signup MITM is unmitigated (no out-of-band trust anchor for the signing tool) — see CR-011 in `docs/Todo/todo.md` and the corrected threat model in `docs/auth-signing.md`.
 - `AUTH_HMAC_SECRET` is required (base64, at least 24 bytes). Server panics if unset.
 - `build.rs` links Homebrew `libpq` on macOS — no env vars needed for local builds.
 - Tests live in `src/tests/` as a mirror of `src/` (e.g. `src/tests/games/chess/main.rs`), wired via `#[path]`.

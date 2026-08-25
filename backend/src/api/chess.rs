@@ -3,8 +3,10 @@
 use axum::{
     body::Body,
     extract::Query,
-    http::{Response, StatusCode, header},
+    http::{HeaderMap, Response, StatusCode, header},
 };
+use diesel::{ExpressionMethods, QueryDsl};
+use diesel_async::RunQueryDsl;
 use serde::Deserialize;
 use std::sync::LazyLock;
 use std::time::Duration;
@@ -47,7 +49,7 @@ fn json_body(status: StatusCode, body: String) -> Response<Body> {
 
 /// GET /api/games/chess/completions?fen=...&depth=5
 ///
-/// `depth`: 1–12 for anonymous, 13–15 gated behind auth (when implemented).
+/// `depth`: 1–12 anonymous; 13–15 requires Bearer session with CAP_DEEP_SEARCH.
 /// Default 5. Runs on a blocking thread so the async runtime isn't starved.
 #[derive(Deserialize)]
 pub struct ChessQuery {
@@ -55,7 +57,10 @@ pub struct ChessQuery {
     depth: Option<usize>,
 }
 
-pub async fn get_chess_completion(Query(q): Query<ChessQuery>) -> Response<Body> {
+pub async fn get_chess_completion(
+    headers: HeaderMap,
+    Query(q): Query<ChessQuery>,
+) -> Response<Body> {
     let fen = match q.fen {
         Some(f) => f,
         None => return json_body(StatusCode::BAD_REQUEST, r#"{"error":"missing 'fen' query parameter"}"#.into()),
@@ -67,7 +72,77 @@ pub async fn get_chess_completion(Query(q): Query<ChessQuery>) -> Response<Body>
         None => 5,
     };
 
-    // TODO: gate depth 13–15 behind auth token
+    // ── Auth gate: depth 13–15 requires a session with CAP_DEEP_SEARCH ──
+    if depth >= 13 {
+        let token = match crate::api::bearer_token(&headers) {
+            Some(t) => t,
+            None => {
+                return json_body(
+                    StatusCode::UNAUTHORIZED,
+                    r#"{"error":"depth 13–15 requires a session token"}"#.into(),
+                );
+            },
+        };
+
+        // Session HMAC binds to the DB-stored nonce_counter, so resolve the
+        // (untrusted) key_id first, fetch the counter, then verify fully.
+        let key_id = match crate::auth::session::peek_key_id(token) {
+            Some(k) => k,
+            None => {
+                return json_body(
+                    StatusCode::UNAUTHORIZED,
+                    r#"{"error":"invalid or expired session token"}"#.into(),
+                );
+            },
+        };
+
+        let mut conn = match crate::db::connect().await {
+            Ok(c) => c,
+            Err(e) => {
+                crate::log_error(crate::LogMsg::Auth {
+                    detail: format!("chess: DB connect failed: {e}"),
+                });
+                return json_body(StatusCode::INTERNAL_SERVER_ERROR, r#"{"error":"internal error"}"#.into());
+            },
+        };
+
+        let row = crate::schema::auth::keys::table
+            .filter(crate::schema::auth::keys::key_id.eq(key_id))
+            .filter(crate::schema::auth::keys::is_active.eq(true))
+            .select((crate::schema::auth::keys::nonce_counter, crate::schema::auth::keys::capabilities))
+            .get_result::<(i64, i16)>(&mut conn)
+            .await;
+
+        let (nonce_counter, capabilities) = match row {
+            Ok(r) => r,
+            Err(diesel::result::Error::NotFound) => {
+                return json_body(
+                    StatusCode::UNAUTHORIZED,
+                    r#"{"error":"invalid or expired session token"}"#.into(),
+                );
+            },
+            Err(e) => {
+                crate::log_error(crate::LogMsg::Auth {
+                    detail: format!("chess: DB select failed: {e}"),
+                });
+                return json_body(StatusCode::INTERNAL_SERVER_ERROR, r#"{"error":"internal error"}"#.into());
+            },
+        };
+
+        if crate::auth::session::parse_session_token(token, nonce_counter).is_err() {
+            return json_body(
+                StatusCode::UNAUTHORIZED,
+                r#"{"error":"invalid or expired session token"}"#.into(),
+            );
+        }
+
+        if capabilities & crate::auth::CAP_DEEP_SEARCH == 0 {
+            return json_body(
+                StatusCode::FORBIDDEN,
+                r#"{"error":"insufficient capabilities"}"#.into(),
+            );
+        }
+    }
 
     // ── Backpressure: reject immediately if all search slots are busy ──
     let permit = match CHESS_SEMAPHORE.try_acquire() {

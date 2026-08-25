@@ -2,7 +2,7 @@
 
 use axum::{
     extract::Query,
-    http::{HeaderMap, StatusCode, header},
+    http::{HeaderMap, StatusCode},
     response::IntoResponse,
     Json,
 };
@@ -12,6 +12,7 @@ use diesel::{
     QueryDsl,
     Queryable,
     Selectable,
+    SelectableHelper,
     insert_into,
     update,
 };
@@ -21,6 +22,8 @@ use std::collections::HashMap;
 
 use crate::auth::session;
 use crate::schema::auth::keys as tbl;
+
+use super::bearer_token;
 
 // ── Request types ────────────────────────────────────────────────
 
@@ -36,7 +39,6 @@ pub struct AuthorizeReq {
     pub nonce: String,       // hex from challenge
     pub hmac_token: String,  // hex from challenge
     pub expires_at: i64,     // timestamp from challenge
-    #[allow(dead_code)] // unused until FALCON verification is wired
     pub falcon_sig: String,  // base64 FALCON signature over nonce
 }
 
@@ -55,8 +57,6 @@ struct NewKey<'a> {
     pub_key: &'a [u8],
 }
 
-// pub_key field unused until FALCON verification is wired.  Expected dead code.
-#[allow(dead_code)]
 #[derive(Queryable, Selectable)]
 #[diesel(table_name = crate::schema::auth::keys)]
 struct KeyRow {
@@ -82,8 +82,14 @@ pub async fn register_key(Json(body): Json<RegisterKeyReq>) -> impl IntoResponse
         &base64::engine::general_purpose::STANDARD,
         &body.pub_key,
     ) {
-        Ok(b) if b.len() <= 4096 => b,
-        Ok(_) => return err(StatusCode::BAD_REQUEST, "pub_key too large (max 4096 bytes)"),
+        // FN-DSA-1024 only — any other size could register but never verify.
+        Ok(b) if b.len() == crate::auth::falcon::FALCON_PUB_KEY_LEN => b,
+        Ok(_) => {
+            return err(
+                StatusCode::BAD_REQUEST,
+                "pub_key must be a FALCON-1024 public key (1793 bytes)",
+            )
+        },
         Err(_) => return err(StatusCode::BAD_REQUEST, "pub_key must be valid base64"),
     };
 
@@ -157,50 +163,84 @@ pub async fn authorize(Json(body): Json<AuthorizeReq>) -> impl IntoResponse {
         _ => return err(StatusCode::BAD_REQUEST, "nonce must be 64 hex chars"),
     };
 
-    // 2. Verify challenge HMAC
+    // 2. Verify challenge HMAC (proves server issued this nonce, not expired)
     if !session::verify_challenge_hmac(&body.key_id, &nonce, body.expires_at, &body.hmac_token) {
         return err(StatusCode::UNAUTHORIZED, "invalid or expired challenge");
     }
 
-    // 3. One-time nonce: reject replays within the challenge window.
+    // 3. Look up the active key
+    let mut conn = match crate::db::connect().await {
+        Ok(c) => c,
+        Err(e) => {
+            crate::log_error(crate::LogMsg::Auth {
+                detail: format!("authorize: DB connect failed: {e}"),
+            });
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "internal error");
+        },
+    };
+
+    let key = match tbl::table
+        .filter(tbl::key_id.eq(&body.key_id))
+        .filter(tbl::is_active.eq(true))
+        .select(KeyRow::as_select())
+        .get_result::<KeyRow>(&mut conn)
+        .await
+    {
+        Ok(k) => k,
+        // Same generic body as a bad signature — no key enumeration.
+        Err(diesel::result::Error::NotFound) => {
+            crate::log_error(crate::LogMsg::Auth {
+                detail: format!("authorize: unknown or inactive key_id={}", body.key_id),
+            });
+            return err(StatusCode::UNAUTHORIZED, "authentication failed");
+        },
+        Err(e) => {
+            crate::log_error(crate::LogMsg::Auth {
+                detail: format!("authorize: DB select failed: {e}"),
+            });
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "internal error");
+        },
+    };
+
+    // 4. Decode + verify the FALCON signature over the raw nonce
+    let sig = match base64::Engine::decode(
+        &base64::engine::general_purpose::STANDARD,
+        &body.falcon_sig,
+    ) {
+        Ok(s) => s,
+        Err(_) => {
+            crate::log_error(crate::LogMsg::Auth {
+                detail: "authorize: falcon_sig base64 decode failed".to_string(),
+            });
+            return err(StatusCode::UNAUTHORIZED, "authentication failed");
+        },
+    };
+
+    if !crate::auth::falcon::falcon_verify(&key.pub_key, &nonce, &sig) {
+        crate::log_error(crate::LogMsg::Auth {
+            detail: format!("authorize: bad FALCON signature for key_id={}", body.key_id),
+        });
+        return err(StatusCode::UNAUTHORIZED, "authentication failed");
+    }
+
+    // 5. Consume the nonce AFTER successful verification (CR-003): failed
+    //    attempts must not burn challenges; successes stay single-use.
     if !session::consume_nonce(&nonce, body.expires_at) {
         return err(StatusCode::UNAUTHORIZED, "nonce already used");
     }
 
-    // 4. Session issuance is DISABLED until FALCON signature verification is wired.
-    //    Previously the FALCON signature was accepted unconditionally, which made
-    //    this endpoint mint valid session tokens for any caller — session forgery.
-    //    Refuse loudly instead of silently authenticating nobody.
-    //
-    //    TODO: wire the flow below when the `falcon` crate lands:
-    //      let mut conn = crate::db::connect().await?;
-    //      let key = tbl::table
-    //          .filter(tbl::key_id.eq(&body.key_id))
-    //          .filter(tbl::is_active.eq(true))
-    //          .select(KeyRow::as_select())
-    //          .get_result::<KeyRow>(&mut conn).await?;
-    //      if !falcon_verify(&key.pub_key, &nonce, &sig) {
-    //          return (StatusCode::UNAUTHORIZED, Json(json!({"error": "bad signature"})));
-    //      }
-    //      let expiry = session::session_expiry(3600);
-    //      let token = session::build_session_token(&body.key_id, key.nonce_counter, expiry);
-    //      return (StatusCode::OK, Json(json!({
-    //          "session_token": token,
-    //          "capabilities": key.capabilities,
-    //          "expires_at": expiry,
-    //      })));
+    // 6. Issue the stateless session token
+    let expiry = session::session_expiry(3600);
+    let token = session::build_session_token(&body.key_id, key.nonce_counter, expiry);
+
     (
-        StatusCode::SERVICE_UNAVAILABLE,
+        StatusCode::OK,
         Json(serde_json::json!({
-            "error": "session issuance disabled: FALCON signature verification not yet wired",
+            "session_token": token,
+            "capabilities": key.capabilities,
+            "expires_at": expiry,
         })),
     )
-}
-
-/// Extract a "Bearer <token>" from the Authorization header.
-fn bearer_token(headers: &HeaderMap) -> Option<&str> {
-    let auth = headers.get(header::AUTHORIZATION)?.to_str().ok()?;
-    auth.strip_prefix("Bearer ").map(str::trim).filter(|t| !t.is_empty())
 }
 
 /// POST /api/auth/logout-all — bump nonce_counter, kill all sessions.

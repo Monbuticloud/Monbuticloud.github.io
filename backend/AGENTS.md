@@ -15,7 +15,7 @@ Rust HTTP server serving portfolio pages, a Lazy SMP chess engine, and FALCON po
 | `src/main.rs` | Server entry | Axum router, logging (`LogMsg`/`LOG_BUFFER`), resource monitor, log flusher, panic hook |
 | `src/db.rs` | DB | `connect()` opens an `AsyncPgConnection` and sets `search_path TO public, auth` |
 | `src/schema.rs` | DB | Diesel `table!` macro for `auth.keys` with `schema_name = "auth"` |
-| `src/auth/` | Auth | `session.rs` (HMAC tokens + challenge nonces); routes live in `src/api/auth.rs` |
+| `src/auth/` | Auth | `session.rs` (HMAC tokens + challenge nonces), `falcon.rs` (FALCON-1024 verify); routes live in `src/api/auth.rs` |
 | `src/games/chess/main.rs` | Chess engine | Board state, move gen, Lazy SMP search, lock-free TT |
 | `src/tests/` | Tests | Mirror of `src/` — test files wired via `#[path]` |
 | `build.rs` | Build | Links Homebrew `libpq` on macOS (no env var needed) |

@@ -189,6 +189,9 @@ pub async fn authorize(Json(body): Json<AuthorizeReq>) -> impl IntoResponse {
         Ok(k) => k,
         // Same generic body as a bad signature — no key enumeration.
         Err(diesel::result::Error::NotFound) => {
+            crate::log_error(crate::LogMsg::Auth {
+                detail: format!("authorize: unknown or inactive key_id={}", body.key_id),
+            });
             return err(StatusCode::UNAUTHORIZED, "authentication failed");
         },
         Err(e) => {
@@ -205,7 +208,12 @@ pub async fn authorize(Json(body): Json<AuthorizeReq>) -> impl IntoResponse {
         &body.falcon_sig,
     ) {
         Ok(s) => s,
-        Err(_) => return err(StatusCode::UNAUTHORIZED, "authentication failed"),
+        Err(_) => {
+            crate::log_error(crate::LogMsg::Auth {
+                detail: "authorize: falcon_sig base64 decode failed".to_string(),
+            });
+            return err(StatusCode::UNAUTHORIZED, "authentication failed");
+        },
     };
 
     if !crate::auth::falcon::falcon_verify(&key.pub_key, &nonce, &sig) {

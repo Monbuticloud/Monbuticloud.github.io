@@ -7,7 +7,7 @@ services:
       POSTGRES_PASSWORD: homepage
       POSTGRES_DB: homepage
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - ./data/postgres:/var/lib/postgresql/data
       - ./config/postgres/postgresql.conf:/etc/postgresql/postgresql.conf:ro
@@ -35,9 +35,9 @@ services:
     restart: unless-stopped
     image: ghcr.io/pgdogdev/pgdog:main
     ports:
-      - "6432:6432"
-      - "8081:8080"
-      - "9631:9630"
+      - "127.0.0.1:6432:6432"
+      - "127.0.0.1:8081:8080"
+      - "127.0.0.1:9631:9630"
     volumes:
       - ./config/pgdog/pgdog.toml:/etc/pgdog/pgdog.toml:ro
       - ./config/pgdog/users.toml:/etc/pgdog/users.toml:ro

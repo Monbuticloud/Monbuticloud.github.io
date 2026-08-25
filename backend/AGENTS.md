@@ -51,6 +51,7 @@ Rust HTTP server serving portfolio pages, a Lazy SMP chess engine, and FALCON po
 - Log tools (`log_error`, etc.) use `#[allow(dead_code)]` — keep them even if unused.
 - Falcon-wasm build: `crates/falcon-wasm/build.sh` runs `wasm-bindgen` + `wasm-opt -Oz`.
 - Session token format: `key_id ‖ salt ‖ HMAC(secret, key_id ‖ salt ‖ nonce_counter ‖ expiry)`.
+- Challenge-nonce replay store (`USED_NONCES`) is process-local memory — single-instance only. Do not scale to multiple replicas without a shared store (see CR-003 note in `src/auth/session.rs`).
 - `.env` is gitignored — never commit secrets.
 
 ## Verification

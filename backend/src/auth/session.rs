@@ -149,6 +149,14 @@ pub fn generate_nonce() -> [u8; 32] {
 
 /// One-time challenge nonces: nonce -> expires_at.
 /// Prevents replaying an authorize request within the challenge window.
+///
+/// SINGLE-INSTANCE CONSTRAINT (CR-003): this store is process-local memory.
+/// A restart clears replay protection (mitigated by the 60s challenge
+/// expiry), and any multi-instance deployment would break single-use
+/// guarantees entirely — each instance tracks its own nonces. Do not scale
+/// to multiple backend replicas without moving this to a shared store
+/// (e.g. Postgres or Redis). Consumption happens AFTER successful FALCON
+/// verification, so failed attempts do not burn challenges.
 static USED_NONCES: LazyLock<Mutex<HashMap<[u8; 32], i64>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 

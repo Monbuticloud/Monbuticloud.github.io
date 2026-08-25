@@ -175,12 +175,66 @@ pub fn session_expiry(ttl_secs: i64) -> i64 {
 mod tests {
     use super::*;
 
+    /// Initialize HMAC_KEY for tests. Each nextest test runs in its own
+    /// process; under plain `cargo test` the Once keeps this idempotent.
+    fn init_hmac() {
+        use std::sync::Once;
+        static INIT: Once = Once::new();
+        INIT.call_once(|| {
+            unsafe {
+                std::env::set_var(
+                    "AUTH_HMAC_SECRET",
+                    base64::Engine::encode(
+                        &base64::engine::general_purpose::STANDARD,
+                        [0x5Au8; 32],
+                    ),
+                );
+            }
+        });
+    }
+
     #[test]
     fn nonce_is_single_use() {
         let nonce = [7u8; 32];
         let expiry = chrono::Utc::now().timestamp() + 60;
         assert!(consume_nonce(&nonce, expiry), "first use must succeed");
         assert!(!consume_nonce(&nonce, expiry), "replay must be rejected");
+    }
+
+    // ── CR-001 regressions: malformed tokens must reject, never panic ──
+
+    #[test]
+    fn wrong_length_hmac_token_rejected_not_panic() {
+        init_hmac();
+        let nonce = [1u8; 32];
+        let expiry = chrono::Utc::now().timestamp() + 60;
+        // Valid hex, but 31 bytes instead of 32 — used to panic in ct_eq.
+        let token = "ab".repeat(31);
+        assert!(!verify_challenge_hmac("k", &nonce, expiry, &token));
+    }
+
+    #[test]
+    fn invalid_hex_hmac_token_rejected_not_panic() {
+        init_hmac();
+        let nonce = [2u8; 32];
+        let expiry = chrono::Utc::now().timestamp() + 60;
+        assert!(!verify_challenge_hmac("k", &nonce, expiry, "zz"));
+        assert!(!verify_challenge_hmac("k", &nonce, expiry, ""));
+    }
+
+    #[test]
+    fn session_token_wrong_length_hmac_part_rejected_not_panic() {
+        init_hmac();
+        let key_id = "laptop";
+        let counter = 0i64;
+        let expiry = chrono::Utc::now().timestamp() + 60;
+        let token = build_session_token(key_id, counter, expiry);
+        let mut parts: Vec<String> = token.split('.').map(String::from).collect();
+        let last = parts.pop().expect("4 parts");
+        // Truncate the HMAC part to a wrong length (valid hex).
+        parts.push(last[..last.len() - 2].to_string());
+        let truncated = parts.join(".");
+        assert!(parse_session_token(&truncated, counter).is_err());
     }
 
     #[test]

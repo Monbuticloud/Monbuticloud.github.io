@@ -260,4 +260,121 @@ mod tests {
         assert_eq!(peek_key_id("not-a-token"), None);
         assert_eq!(peek_key_id("zz.zz.zz.zz"), None); // invalid hex
     }
+
+    // ── CR-004: challenge HMAC coverage ──────────────────────────────
+
+    #[test]
+    fn challenge_hmac_roundtrip() {
+        init_hmac();
+        let nonce = [9u8; 32];
+        let expiry = chrono::Utc::now().timestamp() + 60;
+        let token = build_challenge_hmac("laptop", &nonce, expiry);
+        assert!(verify_challenge_hmac("laptop", &nonce, expiry, &token));
+    }
+
+    #[test]
+    fn challenge_hmac_rejects_expired_challenge() {
+        init_hmac();
+        let nonce = [8u8; 32];
+        let past = chrono::Utc::now().timestamp() - 10;
+        let token = build_challenge_hmac("laptop", &nonce, past);
+        // Valid HMAC, but the challenge window has closed.
+        assert!(!verify_challenge_hmac("laptop", &nonce, past, &token));
+    }
+
+    #[test]
+    fn challenge_hmac_rejects_tampered_token() {
+        init_hmac();
+        let nonce = [6u8; 32];
+        let expiry = chrono::Utc::now().timestamp() + 60;
+        let mut token = build_challenge_hmac("laptop", &nonce, expiry);
+        let mid = token.len() / 2;
+        let flipped = if token.as_bytes()[mid] == b'0' { '1' } else { '0' };
+        token.replace_range(mid..mid + 1, &flipped.to_string());
+        assert!(!verify_challenge_hmac("laptop", &nonce, expiry, &token));
+    }
+
+    #[test]
+    fn challenge_hmac_binds_to_key_id_and_nonce() {
+        init_hmac();
+        let nonce = [5u8; 32];
+        let expiry = chrono::Utc::now().timestamp() + 60;
+        let token = build_challenge_hmac("laptop", &nonce, expiry);
+        // Same token must fail for a different key_id or nonce.
+        assert!(!verify_challenge_hmac("phone", &nonce, expiry, &token));
+        assert!(!verify_challenge_hmac("laptop", &[4u8; 32], expiry, &token));
+    }
+
+    // ── CR-004: session token coverage ───────────────────────────────
+
+    #[test]
+    fn session_token_roundtrip() {
+        init_hmac();
+        let expiry = chrono::Utc::now().timestamp() + 60;
+        let token = build_session_token("laptop", 3, expiry);
+        let parsed = parse_session_token(&token, 3).expect("valid token");
+        assert_eq!(parsed.key_id, "laptop");
+        assert_eq!(parsed.expiry, expiry);
+    }
+
+    #[test]
+    fn session_token_wrong_counter_rejected() {
+        init_hmac();
+        let expiry = chrono::Utc::now().timestamp() + 60;
+        let token = build_session_token("laptop", 3, expiry);
+        // Token minted for counter 3 must die after logout-all bumps to 4.
+        assert!(parse_session_token(&token, 4).is_err());
+    }
+
+    #[test]
+    fn session_token_expired_rejected() {
+        init_hmac();
+        let past = chrono::Utc::now().timestamp() - 10;
+        let token = build_session_token("laptop", 0, past);
+        assert!(parse_session_token(&token, 0).is_err());
+    }
+
+    #[test]
+    fn session_token_part_count_enforced() {
+        init_hmac();
+        assert!(parse_session_token("aa.bb.cc", 0).is_err());
+        assert!(parse_session_token("aa.bb.cc.dd.ee", 0).is_err());
+        assert!(parse_session_token("", 0).is_err());
+    }
+
+    #[test]
+    fn session_token_invalid_hex_in_each_part_rejected() {
+        init_hmac();
+        let expiry = chrono::Utc::now().timestamp() + 60;
+        let token = build_session_token("laptop", 0, expiry);
+        let parts: Vec<String> = token.split('.').map(String::from).collect();
+        for i in 0..4 {
+            let mut bad = parts.clone();
+            bad[i] = "zz".repeat(bad[i].len() / 2); // same length, invalid hex
+            assert!(
+                parse_session_token(&bad.join("."), 0).is_err(),
+                "part {i} with invalid hex must be rejected"
+            );
+        }
+    }
+
+    #[test]
+    fn session_token_wrong_length_salt_and_expiry_rejected() {
+        init_hmac();
+        let key_hex = hex::encode("laptop");
+        // Salt of 15 bytes instead of 16.
+        let t = format!("{key_hex}.{}.{}.{}", hex::encode([0u8; 15]), hex::encode(0i64.to_be_bytes()), "ab".repeat(32));
+        assert!(parse_session_token(&t, 0).is_err());
+        // Expiry of 7 bytes instead of 8.
+        let t = format!("{key_hex}.{}.{}.{}", hex::encode([0u8; 16]), hex::encode([0u8; 7]), "ab".repeat(32));
+        assert!(parse_session_token(&t, 0).is_err());
+    }
+
+    #[test]
+    fn session_token_non_utf8_key_id_rejected() {
+        init_hmac();
+        // Valid hex decoding to invalid UTF-8 (0xFF is never valid UTF-8 alone).
+        let t = format!("ff.{}.{}.{}", hex::encode([0u8; 16]), hex::encode(0i64.to_be_bytes()), "ab".repeat(32));
+        assert!(parse_session_token(&t, 0).is_err());
+    }
 }

@@ -38,7 +38,7 @@ Rust HTTP server serving portfolio pages, a Lazy SMP chess engine, and FALCON po
 4. **Stateless sessions** — HMAC token with `nonce_counter`. No session table. Challenge nonces are single-use (replay-protected); `logout-all` requires a valid session token.
 5. **Lazy SMP** — `rayon::scope` with `CHESS_POOL` (dedicated Rayon pool, 256KB stacks).
 6. **Semaphore backpressure** — `CHESS_SEMAPHORE`, `try_acquire` → 503 immediately.
-7. **Auth** — FALCON pub key is public by definition. Registration is open but refuses to overwrite an existing `key_id` (409). Private key never touches the server.
+7. **Auth** — FALCON pub key is public by definition. Registration is open but refuses to overwrite an existing `key_id` (409); nginx rate-limits `/api/auth/keys` to 5 req/min per IP (429). Private key never touches the server.
 8. **Diesel** — Type-safe queries, `table!` macro, no raw SQL for auth.
 
 ## Work Guidance

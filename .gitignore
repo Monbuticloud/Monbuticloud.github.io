@@ -18,3 +18,6 @@ backend/v
 
 # SDD worktrees
 .worktrees/
+
+# macOS junk
+.DS_Store

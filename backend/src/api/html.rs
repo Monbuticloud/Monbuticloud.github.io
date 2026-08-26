@@ -26,7 +26,13 @@ fn mime_for_path(path: &str) -> &'static mime::Mime {
 
 #[inline(always)]
 pub async fn serve_static(path: &'static str) -> Response<Body> {
-    if let Some(cached) = FILE_CACHE.read().unwrap().get(path) {
+    // Recover from a poisoned lock instead of cascading panics into every
+    // subsequent handler (CR-010): the guard's data is still valid.
+    if let Some(cached) = FILE_CACHE
+        .read()
+        .unwrap_or_else(|p| p.into_inner())
+        .get(path)
+    {
         let (status, content, mime) = cached;
 
         return Response::builder()
@@ -48,7 +54,7 @@ pub async fn serve_static(path: &'static str) -> Response<Body> {
     if status == StatusCode::OK {
         FILE_CACHE
             .write()
-            .unwrap()
+            .unwrap_or_else(|p| p.into_inner())
             .insert(path, (status, content.clone(), mime));
     }
 

@@ -22,49 +22,49 @@ CREATE SCHEMA IF NOT EXISTS auth;
 --
 -- Generic auth for the entire homepage API (chess, projects, etc.).
 --
-──
+--
 -- FLOW
-──
+--
 --   REGISTER KEY (open — no proof required, pub key is public)
-─     POST /api/auth/keys  { "key_id":"laptop", "pub_key":"<base64>" }
-──
+--     POST /api/auth/keys  { "key_id":"laptop", "pub_key":"<base64>" }
+--
 --   1. CHALLENGE  (stateless — HMAC, no DB)
 --     GET /auth/challenge?key_id=laptop
 --     ← { nonce(32B hex), hmac_token, expiry_unix }
 --     Server: hmac_token = HMAC(secret, "chal" ‖ key_id ‖ nonce ‖ expiry)
-──
+--
 --   2. AUTHORIZE  (one FALCON verify, returns stateless session)
 --     POST /auth/authorize  { "key_id":"laptop", "nonce":"...",
 --                              "hmac_token":"...", "falcon_sig":"<base64>" }
 --     Server: verify HMAC → verify FALCON sig(nonce) against pub_key
 --             → build session_token
 --             ← { session_token, max_depth, expires_at }
-──
+--
 --   3. USE  (no FALCON — just parse token + quick DB counter check)
 --     Any route: include ?session_token=... in request
 --     Server: parse key_id from token → SELECT nonce_counter
 --             → recompute HMAC → reject if stale → process
-──
+--
 --   LOG OUT ALL
 --     POST /auth/logout-all  { "key_id":"laptop" }
 --     Server: INCREMENT nonce_counter → all old session HMACs invalid
-─
+--
 -- SESSION TOKEN FORMAT (hex, split by '.')
-──
+--
 --   key_id_hex . session_salt_hex(32) . expiry_hex . hmac_hex(64)
-──
+--
 --   hmac = HMAC-SHA256(secret, "session" ‖ key_id ‖ salt ‖ counter ‖ expiry)
 --   salt = 16 random bytes (unique per issuance, even at same counter)
-──
+--
 -- DB READS PER REQUEST
-──
+--
 --   Challenge:  0 (pure HMAC)
 --   Authorize:  1 (SELECT pub_key, nonce_counter, max_depth)
 --   Use:        1 (SELECT nonce_counter)
 --   Logout all: 1 (UPDATE nonce_counter)
-─
+--
 -- DB WRITES PER REQUEST
-──
+--
 --   Authorize:  0 (session is stateless)
 -- ═══════════════════════════════════════════════════════════════════
 

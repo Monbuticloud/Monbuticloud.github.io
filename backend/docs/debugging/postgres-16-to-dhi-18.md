@@ -54,8 +54,19 @@ rm -rf data/postgres-v16.bak data/pre-dhi-dump.sql   # contains no secrets, but 
 - [ ] Full auth round-trip works (register → challenge → authorize)
 - [ ] Chess search works through PgDog
 
-## Gotchas found during research
+## Gotchas found during the actual migration (2026-08-26)
 
+- **`command:` must be flags-only.** The DHI entrypoint invokes the postgres
+  binary itself; `command: postgres -c ...` fails with
+  `postgres: invalid argument: "postgres"`. Use
+  `command: ["-c", "config_file=/etc/postgresql/postgresql.conf"]`.
+- **Custom `command:` skips POSTGRES_DB creation.** initdb ran and created
+  the `homepage` role, but the `homepage` database was not created. Fixed
+  manually: `CREATE DATABASE homepage OWNER homepage;`
+- **setup.sql had never run successfully on ANY version** — it used
+  box-drawing characters (`──`, `┬`) as comment markers, which are invalid
+  SQL. This is why the old v16 cluster was empty (no `auth` schema). Fixed
+  in the same commit as this migration.
 - DHI runtime variants have **no shell/apk** — debug via `docker debug`, not
   `docker compose exec ... sh`.
 - Stop signal is **SIGINT** (fast shutdown) vs stock SIGTERM — compose
@@ -63,7 +74,11 @@ rm -rf data/postgres-v16.bak data/pre-dhi-dump.sql   # contains no secrets, but 
   stops.
 - `POSTGRES_HOST_AUTH_METHOD=trust` would be **rejected** by the entrypoint
   (scram-sha-256/md5 only) — we don't use it.
-- `/docker-entrypoint-initdb.d/` scripts are not explicitly documented for
-  DHI; verified working semantics are assumed from the shared entrypoint.
-  If `setup.sql` does NOT run on first init, apply it manually:
-  `docker compose exec -T postgres psql -U homepage -d homepage < config/postgres/setup.sql`
+
+## Actual result
+
+- PostgreSQL 18.6 (dhi.io/postgres:18-alpine3.23), healthy, healthcheck green
+- `auth.keys` + helper functions created from fixed setup.sql
+- Full stack verified: chess search via nginx → app → PgDog → Postgres 18
+  returns best_move; depth validation 400s; `/api/auth/challenge` 200.
+- Old datadir archived at `data/postgres-v16.bak` (delete after a soak period).

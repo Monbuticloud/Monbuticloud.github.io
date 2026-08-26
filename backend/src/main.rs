@@ -326,9 +326,9 @@ fn main() {
 async fn track_request(request: axum::http::Request<Body>, next: Next) -> Response<Body> {
     let path = request.uri().path().to_owned();
 
-    let time = Utc::now();
-
-    LOG_BUFFER.push((LogMsg::Request { path }, LogLevel::Info, time));
+    // Route through log_info (not LOG_BUFFER directly) so LOG_DEPTH
+    // increments and the >10k early-flush trigger stays accurate (CR-007).
+    log_info(LogMsg::Request { path });
 
     next.run(request).await
 }

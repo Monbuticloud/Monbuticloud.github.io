@@ -2410,6 +2410,16 @@ const MAX_PLY: usize = 64;
 
 const MAX_SEARCH_PLY: usize = 128; // Hard cap against stack overflow
 
+/// Mate scores are encoded as distance-from-root: `±(MATE_SCORE - ply)`.
+/// The side to move that is checkmated gets `-(MATE_SCORE - ply)`; being
+/// mated deeper is better, so the score rises with ply.
+const MATE_SCORE: i32 = 20000;
+
+/// Scores beyond this threshold encode forced mates. Used to re-anchor mate
+/// scores between root-relative (search values) and node-relative (TT
+/// stored) representations (CR-008). Safely above any real eval (~13k max).
+const MATE_BOUND: i32 = MATE_SCORE - MAX_SEARCH_PLY as i32;
+
 fn search(board: &mut Board, depth: usize, mut alpha: i32, beta: i32, killers: &mut [[Move; 2]], ply: usize) -> (i32, Move) {
 
     validate_piece_lists!(board, "search(depth={},ply={})", depth, ply);
@@ -2437,6 +2447,19 @@ fn search(board: &mut Board, depth: usize, mut alpha: i32, beta: i32, killers: &
     let tt_result = TT.probe(zobrist_key);
 
     if let Some((tt_score, tt_move_packed, tt_depth, tt_flags)) = tt_result {
+
+        // Mate scores in the TT are node-relative — re-anchor to this node's
+        // ply before using them (CR-008).
+        let tt_score = if tt_score > MATE_BOUND {
+
+            tt_score - ply as i32
+        } else if tt_score < -MATE_BOUND {
+
+            tt_score + ply as i32
+        } else {
+
+            tt_score
+        };
 
         // Unpack TT best move (used on early returns instead of local zero Move)
         let tt_best = if tt_move_packed != 0 {
@@ -2493,8 +2516,9 @@ fn search(board: &mut Board, depth: usize, mut alpha: i32, beta: i32, killers: &
         // Checkmate or stalemate
         if in_check(board) {
 
-            // Checkmate (negative value, the deeper the worse)
-            return (-20000 + board.fullmove_number as i32, best_move);
+            // Checkmated here: score is distance-from-root (CR-008) —
+            // being mated deeper is better, so add ply.
+            return (-MATE_SCORE + ply as i32, best_move);
         } else {
 
             return (0, best_move);
@@ -2689,7 +2713,20 @@ fn search(board: &mut Board, depth: usize, mut alpha: i32, beta: i32, killers: &
 
     if best_move.from != best_move.to || best_move.promotion != Piece::Empty {
 
-        TT.store(zobrist_key, alpha, pack_move_data(&best_move), depth as u8, flags);
+        // Store mate scores node-relative so they stay correct when probed
+        // from a different ply (CR-008).
+        let store_score = if alpha > MATE_BOUND {
+
+            alpha + ply as i32
+        } else if alpha < -MATE_BOUND {
+
+            alpha - ply as i32
+        } else {
+
+            alpha
+        };
+
+        TT.store(zobrist_key, store_score, pack_move_data(&best_move), depth as u8, flags);
     }
 
     (alpha, best_move)

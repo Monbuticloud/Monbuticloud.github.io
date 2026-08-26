@@ -134,3 +134,16 @@ Items moved here from `todo.md` on completion. Keep the original `Since` and
 - Status: closed
 - Closed: 2026-08-24
 - Outcome: Resolved by fix/file-cache-poisoned-lock (df88e30): FILE_CACHE read/write use unwrap_or_else(|p| p.into_inner()) to recover from poisoning instead of cascading handler panics.
+
+## [CR-012] Migrate Postgres image to dhi.io/postgres:18-alpine3.23
+
+- P: 4
+- B: 2
+- Since: 2026-08-26
+- Since commit: 9484b58
+- File: backend/docker-compose.yml:4
+- Summary: Replace `postgres:16-alpine` with `dhi.io/postgres:18-alpine3.23` (Docker Hardened Images). Major-version jump 16→18 requires pg_upgrade or dump/restore of `./data/postgres`; verify PgDog compatibility and that the hardened image honors the same config/init mounts (`config/postgres/*`, healthcheck).
+- Status: closed
+- Closed: 2026-08-26
+- Outcome: Migrated and verified live (7544093 + fix/dhi-migration-findings). Gotchas: DHI entrypoint takes flags-only command; custom command skips POSTGRES_DB creation (created manually); setup.sql had NEVER run on any version due to invalid box-drawing comment chars — fixed. Full stack verified on 18.6: chess via PgDog OK, auth challenge OK. Old datadir archived at data/postgres-v16.bak.
+

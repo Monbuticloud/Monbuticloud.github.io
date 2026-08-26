@@ -1,7 +1,10 @@
 services:
   postgres:
     restart: unless-stopped
-    image: postgres:16-alpine
+    # Docker Hardened Image — requires `docker login dhi.io` (free).
+    # PGDATA lives at /var/lib/postgresql/18/data, so the mount is the
+    # PARENT dir (see docs/debugging/postgres-16-to-dhi-18.md).
+    image: dhi.io/postgres:18-alpine3.23
     environment:
       POSTGRES_USER: homepage
       POSTGRES_PASSWORD: homepage
@@ -9,7 +12,7 @@ services:
     ports:
       - "127.0.0.1:5432:5432"
     volumes:
-      - ./data/postgres:/var/lib/postgresql/data
+      - ./data/postgres:/var/lib/postgresql
       - ./config/postgres/postgresql.conf:/etc/postgresql/postgresql.conf:ro
       - ./config/postgres/setup.sql:/docker-entrypoint-initdb.d/00-setup.sql:ro
     command: postgres -c config_file=/etc/postgresql/postgresql.conf

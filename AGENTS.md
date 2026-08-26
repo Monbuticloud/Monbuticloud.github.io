@@ -102,7 +102,7 @@ Monorepo for Monbuticloud's personal portfolio site and projects.
 
 ## Local Contracts
 
-1. **Backend**: Run with `docker compose up --build` from `backend/`. Depends on Docker Desktop, `wasm-bindgen` + `wasm-opt` for falcon-wasm.
+1. **Backend**: Run with `docker compose up --build` from `backend/`. Depends on Docker Desktop, `docker login dhi.io` (free, for the hardened Postgres image), `wasm-bindgen` + `wasm-opt` for falcon-wasm.
 2. **Frontend**: Static HTML stub. Once built, will deploy from `frontend/` to GitHub Pages.
 3. **Auth**: FALCON (FN-DSA-1024) signatures verified server-side via `falcon-rs`; registration restricted to 1024-param pub keys. Private key generated client-side, never uploaded. HMAC stateless sessions with nonce_counter revocation.
 4. **Chess**: Depth 1–15; depth 13–15 require a Bearer session with CAP_DEEP_SEARCH (enforced server-side). Lazy SMP via `rayon::scope`. Semaphore backpressure → 503.

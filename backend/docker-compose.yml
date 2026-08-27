@@ -14,6 +14,7 @@ services:
     volumes:
       - ./data/postgres:/var/lib/postgresql
       - ./config/postgres/postgresql.conf:/etc/postgresql/postgresql.conf:ro
+      - ./config/postgres/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
       - ./config/postgres/setup.sql:/docker-entrypoint-initdb.d/00-setup.sql:ro
     # DHI entrypoint invokes the postgres binary itself — pass only flags.
     command: ["-c", "config_file=/etc/postgresql/postgresql.conf"]

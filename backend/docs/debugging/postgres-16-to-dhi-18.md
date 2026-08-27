@@ -72,6 +72,11 @@ rm -rf data/postgres-v16.bak data/pre-dhi-dump.sql   # contains no secrets, but 
 - Stop signal is **SIGINT** (fast shutdown) vs stock SIGTERM — compose
   `restart: unless-stopped` handles it; just don't be surprised by faster
   stops.
+- **DHI default `pg_hba.conf` locks to localhost only.** PgDog connections
+  from the Docker network failed with
+  `FATAL: no pg_hba.conf entry for host "fd3b:..."`. Fixed by adding a
+  custom `config/postgres/pg_hba.conf` (trust locally, scram-sha-256 for
+  `0.0.0.0/0` + `::0/0`) and wiring `hba_file` in `postgresql.conf`.
 - `POSTGRES_HOST_AUTH_METHOD=trust` would be **rejected** by the entrypoint
   (scram-sha-256/md5 only) — we don't use it.
 
@@ -79,6 +84,11 @@ rm -rf data/postgres-v16.bak data/pre-dhi-dump.sql   # contains no secrets, but 
 
 - PostgreSQL 18.6 (dhi.io/postgres:18-alpine3.23), healthy, healthcheck green
 - `auth.keys` + helper functions created from fixed setup.sql
-- Full stack verified: chess search via nginx → app → PgDog → Postgres 18
-  returns best_move; depth validation 400s; `/api/auth/challenge` 200.
-- Old datadir archived at `data/postgres-v16.bak` (delete after a soak period).
+  (after fixing `command:` + `POSTGRES_DB` + `pg_hba.conf` + box-drawing).
+- Full stack **and FALCON smoke verified** after `docker compose up -d --build`:
+  register 201, challenge 200, authorize 200 → session, depth 14 with token
+  200, depth 14 anon 401, depth 12 anon 200, replay 401, logout-all 200,
+  old token after logout 401.
+- Old datadir archived at `data/postgres-v16.bak` + dump at
+  `data/pre-dhi-dump.sql` (3.5 KB, role only — cluster was empty) — delete
+  after a soak period.

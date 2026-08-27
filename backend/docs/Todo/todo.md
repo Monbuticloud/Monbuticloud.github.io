@@ -49,7 +49,7 @@ Sorted by priority (P) descending. See `Guide.md` for tag rules.
 - Since: 2026-08-27
 - Since commit: 2d2acca
 - File: backend/static/script.js
-- Summary: Rainbow, terminal intro, command map, interactive terminal, and grid canvas live in one file — violates <50 lines/function and testability. Fix: split to `rainbow.js` / `terminal/intro.js` / `terminal/commands.js` / `terminal/input.js` / `grid/canvas.js` with explicit `export`s; keep `index.html` as composition root.
+- Summary: Rainbow, terminal intro, command map, interactive terminal, and grid canvas live in one file — violates <50 lines/function and testability. Fix: split per page — small pages stay a single file (e.g. `contact.js`), large pages become a folder (e.g. `pages/index/terminal/`, `pages/index/grid/`); e.g. `rainbow.js` / `terminal/intro.js` / `terminal/commands.js` / `terminal/input.js` / `grid/canvas.js` with explicit `export`s; keep `index.html` as composition root.
 - Status: open
 
 ## [FE-006] No Tailwind/Flowbite despite standards

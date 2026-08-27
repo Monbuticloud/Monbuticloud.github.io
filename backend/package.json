@@ -1,0 +1,16 @@
+{
+  "private": true,
+  "description": "CSS tooling for FE-003 — postcss flattening and stylelint",
+  "scripts": {
+    "build:css": "postcss static/*.css --dir static/dist --config ./",
+    "lint:css": "stylelint \"static/*.css\" --config .stylelintrc.json",
+    "lint:css:fix": "stylelint \"static/*.css\" --config .stylelintrc.json --fix"
+  },
+  "devDependencies": {
+    "postcss": "^8.4.49",
+    "postcss-cli": "^11.0.0",
+    "postcss-preset-env": "^10.1.2",
+    "stylelint": "^16.12.0",
+    "stylelint-config-standard": "^36.0.1"
+  }
+}

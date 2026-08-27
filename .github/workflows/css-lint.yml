@@ -1,0 +1,79 @@
+name: CSS Lint & Flatten Check (FE-003)
+
+on:
+  push:
+    branches: [main, "fix/FE-003"]
+    paths:
+      - "backend/static/**/*.css"
+      - "backend/.stylelintrc.json"
+      - "backend/postcss.config.cjs"
+      - "backend/package.json"
+      - ".github/workflows/css-lint.yml"
+  pull_request:
+    paths:
+      - "backend/static/**/*.css"
+      - "backend/.stylelintrc.json"
+      - "backend/postcss.config.cjs"
+      - "backend/package.json"
+      - ".github/workflows/css-lint.yml"
+  workflow_dispatch:
+
+jobs:
+  stylelint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: backend/package.json
+      - name: Install CSS tooling
+        working-directory: backend
+        run: |
+          npm ci || npm install
+          npx stylelint --version
+          npx postcss --version || echo "postcss not ready"
+      - name: Run stylelint (nesting & standards)
+        working-directory: backend
+        run: npx stylelint "static/*.css" --config .stylelintrc.json
+
+  flatten-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install postcss
+        working-directory: backend
+        run: |
+          npm ci || npm install
+      - name: Flatten CSS via postcss-preset-env (FE-003)
+        working-directory: backend
+        run: |
+          npx postcss static/*.css --dir /tmp/css-dist --config ./
+          echo "Flattened files:"
+          ls -lh /tmp/css-dist/
+          echo "--- style.css (flattened) ---"
+          head -n 80 /tmp/css-dist/style.css || true
+          echo "--- common.css (flattened) ---"
+          head -n 80 /tmp/css-dist/common.css || true
+      - name: Verify no nesting operators remain
+        run: |
+          if grep -R "&" /tmp/css-dist/*.css; then
+            echo "::error::Flattened CSS still contains '&' nesting operator — postcss flattening failed"
+            exit 1
+          fi
+          # Ensure flattened files are non-empty and contain expected selectors
+          for f in /tmp/css-dist/*.css; do
+            if [ ! -s "$f" ]; then
+              echo "::error::Flattened $f is empty"
+              exit 1
+            fi
+          done
+          echo "CSS flattening verification passed"

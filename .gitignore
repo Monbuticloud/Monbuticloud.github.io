@@ -16,6 +16,9 @@ backend/.env
 backend/.tmp/
 backend/v
 
+# FE-003: Generated flattened CSS (Docker image-time `postcss` output)
+backend/static/dist/
+
 # SDD worktrees
 .worktrees/
 

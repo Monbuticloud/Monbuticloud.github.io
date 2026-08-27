@@ -1,3 +1,20 @@
+# FE-003: CSS flattening stage — Node 20 + postcss-cli + postcss-preset-env
+# Flattens CSS Nesting Level 1 (e.g. `#name-section { #name-span {} }`,
+# `.glass { &::before }`) from static/*.css → static/dist/*.css.
+# Source files remain nested (author input); flattened output is served.
+FROM node:20-alpine AS css-builder
+WORKDIR /build
+RUN npm install -g postcss postcss-cli postcss-preset-env
+COPY postcss.config.cjs ./
+COPY static/ ./static/
+RUN mkdir -p ./static/dist && \
+    for f in ./static/*.css; do \
+        postcss "$f" --config ./ --output "./static/dist/$(basename "$f")"; \
+    done && \
+    echo "FE-003: CSS flattening complete" && ls -lh ./static/dist/ && \
+    echo "--- flattened style.css head ---" && head -n 40 ./static/dist/style.css || true && \
+    echo "--- flattened common.css head ---" && head -n 40 ./static/dist/common.css || true
+
 # Build stage
 FROM rust:alpine AS builder
 
@@ -34,6 +51,12 @@ COPY static/assets/ /static/assets/
 # kept only so OPENING_BOOK=/static/filtered.bin can override at runtime.
 COPY src/games/chess/filtered.bin /static/filtered.bin
 
+# FE-003: Copy flattened CSS from css-builder → /static/dist and
+# overwrite /static/*.css so the served files are flattened output.
+# Keeps source as author input; dist is the served artifact.
+COPY --from=css-builder /build/static/dist /static/dist
+RUN cp /static/dist/*.css /static/ 2>/dev/null || true
+
 # ── Minify static assets (builder stage only — zero impact on final image) ──
 RUN apk add --no-cache nodejs npm && \
     npm install -g html-minifier-terser uglify-js csso-cli svgo && \
@@ -41,7 +64,7 @@ RUN apk add --no-cache nodejs npm && \
         html-minifier-terser --collapse-whitespace --remove-comments \
           --remove-optional-tags -o "$f" "$f" 2>/dev/null || true; \
     done && \
-    for f in /static/*.css; do \
+    for f in /static/*.css /static/dist/*.css; do \
         csso "$f" --output "$f" 2>/dev/null || true; \
     done && \
     for f in /static/*.js; do \

@@ -58,7 +58,7 @@ Sorted by priority (P) descending. See `Guide.md` for tag rules.
 - B: 2
 - Since: 2026-08-27
 - Since commit: 2d2acca
-- File: backend/static/common.css:4-13, backend/static/*.html
+- File: backend/static/common.css:4-13, backend/static/\*.html
 - Summary: `ui-styling-standards` mandates Tailwind via `<script src="https://cdn.tailwindcss.com">` + Flowbite, but the repo serves hand-rolled CSS with redundant 8-digit hex `ff` suffixes and only two `@media (max-width:600px)` breakpoints (missing `sm/md/lg/xl/2xl`). Fix: either adopt Tailwind CDN + Flowbite or document an exception in `AGENTS.md`; remove `ff` suffixes and add mobile-first breakpoints tested at 375/768/1024/1440.
 - Status: open
 
@@ -92,12 +92,12 @@ Sorted by priority (P) descending. See `Guide.md` for tag rules.
 - Summary: Terminal `<input>` has only a placeholder (no `<label>`/`aria-label`); skills use `<div class="skill-card">` instead of `<ul><li>`; canonical/OG URLs hard-code `https://monbuticloud.github.io/` while dev serves from `localhost`/`monvip.dev`; `* { color: var(--body-text) }` overrides SVG `fill: currentColor` intent. Fix: label the input, use list semantics, make canonical/OG host-relative or env-driven, and scope the `*` color to `body`.
 - Status: open
 
-## [FE-010] Repo hygiene — .DS_Store reappeared + frontend stub
+## [FE-010] Repo hygiene — .DS_Store reappeared + Pages placeholder
 
 - P: 2
 - B: 0
 - Since: 2026-08-27
 - Since commit: 2d2acca
 - File: backend/static/.DS_Store, backend/static/assets/.DS_Store, backend/static/assets/images/.DS_Store, frontend/index.html
-- Summary: Glob found three `.DS_Store` files (untracked, gitignored since `2be4f02` but still on disk) and `frontend/index.html` is a single-line `<h1>` stub with no viewport/meta. Fix: `trash` the three `.DS_Store`s; either scaffold `frontend/` with Vite/Next or document the stub as intentional in `frontend/AGENTS.md`.
+- Summary: Glob found three `.DS_Store` files (untracked, gitignored since `2be4f02` but still on disk). `frontend/` is NOT the real frontend — `backend/static` is (served via Nginx; `frontend/` is just the GitHub Pages placeholder per `AGENTS.md`). Fix: `trash` the three `.DS_Store`s; update `frontend/index.html` copy to make the placeholder role explicit (link to the real site) or add `frontend/AGENTS.md` documenting the split.
 - Status: open

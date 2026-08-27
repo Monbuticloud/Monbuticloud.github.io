@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Homepage — Frontend</title>
+  <meta name="robots" content="noindex">
+  <title>Homepage — Frontend Placeholder</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -18,7 +19,10 @@
     main { max-width: 640px; padding: 2rem; }
     h1 { font-size: 2rem; font-weight: 300; margin-bottom: 0.5rem; }
     h1 span { font-weight: 600; }
-    p  { line-height: 1.7; color: #a1a1aa; margin-bottom: 1.5rem; }
+    p  { line-height: 1.7; color: #a1a1aa; margin-bottom: 1rem; }
+    p:last-of-type { margin-bottom: 1.5rem; }
+    a { color: #93c5fd; text-decoration: underline; text-underline-offset: 3px; }
+    a:hover { color: #bfdbfe; }
     code {
       display: block;
       background: #18181b;
@@ -31,28 +35,52 @@
       white-space: pre;
       overflow-x: auto;
     }
+    code.inline {
+      display: inline;
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+      font-size: 0.85em;
+      white-space: nowrap;
+    }
     .comment { color: #6b7280; }
     .prompt  { color: #22c55e; }
+    .notice {
+      background: #18181b;
+      border: 1px solid #27272a;
+      border-left: 3px solid #f59e0b;
+      border-radius: 8px;
+      padding: 0.9rem 1.1rem;
+      margin-bottom: 1.5rem;
+      font-size: 0.92rem;
+      line-height: 1.6;
+      color: #d4d4d8;
+    }
+    .notice strong { color: #fbbf24; font-weight: 600; }
   </style>
 </head>
 <body>
   <main>
-    <h1>🚧 <span>Frontend</span></h1>
+    <h1>🚧 <span>Placeholder</span></h1>
+    <div class="notice">
+      <strong>Heads up:</strong> this <code class="inline">frontend/</code> folder is <strong>not</strong> the real frontend.
+      The actual site lives in <code class="inline">backend/static/</code> and is served locally via Nginx + Rust (<code class="inline">docker compose up --build</code> from <code class="inline">backend/</code>).
+      This directory exists only as the GitHub Pages placeholder.
+    </div>
     <p>
-      This is a placeholder. The frontend is not deployed — build and run
-      it on your local machine instead.
+      Live site &rarr; <a href="https://monbuticloud.github.io/">monbuticloud.github.io</a> &mdash;
+      source of truth is <code class="inline">backend/static/</code>.
     </p>
-    <code><span class="comment"># clone &amp; install</span>
-<span class="prompt">$</span> git clone https://github.com/&lt;you&gt;/homepage
-<span class="prompt">$</span> cd homepage/frontend
-<span class="prompt">$</span> npm install
+    <p>
+      If you expected an app here, run the real frontend locally:
+    </p>
+    <code><span class="comment"># clone &amp; run the real site (backend/static via Nginx)</span>
+<span class="prompt">$</span> git clone https://github.com/monbuticloud/homepage
+<span class="prompt">$</span> cd homepage/backend
+<span class="prompt">$</span> docker compose up --build
+<span class="comment"># → http://localhost:8080</span>
 
-<span class="comment"># dev server</span>
-<span class="prompt">$</span> npm run dev
-
-<span class="comment"># production build</span>
-<span class="prompt">$</span> npm run build
-<span class="prompt">$</span> npm run preview</code>
+<span class="comment"># this placeholder deploys to Pages from ./frontend (no build)</span>
+<span class="prompt">$</span> open https://monbuticloud.github.io/</code>
   </main>
 </body>
 </html>

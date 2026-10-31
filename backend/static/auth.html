@@ -144,6 +144,7 @@ button.danger:hover { background: #a03030; }
   border-radius: 3px;
   font-size: 0.75em;
   word-break: break-all;
+  white-space: pre-wrap;
   color: var(--lime-cream-500);
   border: 1px solid transparent;
 }
@@ -192,13 +193,9 @@ button.danger:hover { background: #a03030; }
 <body>
 
 <div style="font-size:0.75em;color:var(--rosy-taupe-500);margin-bottom:1.5em;background:#151525;border:1px solid #2a2a3e;border-radius:3px;padding:0.6em 1em">
-  <strong style="color:var(--lime-cream-500)">⟐ Offline use:</strong>
-  Save this page for air-gapped signing:
-  <kbd style="background:#0d0d1a;padding:0.1em 0.4em;border-radius:2px">Ctrl+S</kbd>
-  →
-  <em>"Web Archive, Single File (.mhtml)"</em>
-  or download as
-  <a href="/auth-tool.mhtml" style="color:var(--lime-cream-500)">homepage-auth.mhtml</a>
+  <strong style="color:var(--lime-cream-500)">⟐ FALCON WASM:</strong>
+  This page loads <code>falcon_wasm.js</code> + <code>falcon_wasm_bg.wasm</code> from the backend.
+  Offline/MHTML copies cannot fetch external WASM, so they show a blocking banner — there is no ECDSA fallback.
 </div>
 
 <h1>
@@ -206,8 +203,8 @@ button.danger:hover { background: #a03030; }
   <small>FALCON challenge-response signing</small>
 </h1>
 
-<!-- FALCON WASM banner: visible when wasm not loaded or ECDSA fallback would have been used -->
-<div id="falcon-banner" class="hidden" style="margin-bottom:1em;padding:0.6em 1em;background:#2a1515;border:1px solid #802020;border-radius:3px;color:#d45050;font-size:0.75em;line-height:1.5"></div>
+<!-- FALCON WASM banner: visible when the WASM bundle cannot be loaded -->
+<div id="falcon-banner" class="hidden" style="margin-bottom:1em;padding:0.6em 1em;background:#2a1515;border:1px solid #802020;border-radius:3px;color:#d45050;font-size:0.75em;line-height:1.5;white-space:pre-line"></div>
 
 <!-- ═══ Step 1: Key Manager ═══ -->
 <div class="card">
@@ -215,7 +212,7 @@ button.danger:hover { background: #a03030; }
 
   <div class="row">
     <label>key_id</label>
-    <input type="text" id="key-id" value="laptop" placeholder="e.g. laptop, phone, server">
+    <input type="text" id="key-id" value="laptop" maxlength="64" placeholder="e.g. laptop, phone, server">
     <button id="btn-generate">Generate Keypair</button>
   </div>
 
@@ -268,16 +265,16 @@ button.danger:hover { background: #a03030; }
 // ═══════════════════════════════════════════════════════════════════
 // Auth Tool — client-side FALCON-1024 key management + challenge-response
 //
-// FALCON-1024 (FN-DSA-1024): pub 1793B, priv 2305B, sig ~1330B
-// Served via `crates/falcon-wasm` — see backend/crates/falcon-wasm/build.sh
-//   cargo build --target wasm32-unknown-unknown --release
-//   wasm-bindgen --out-dir pkg --target web
-//   wasm-opt -Oz -o pkg/falcon_wasm_bg.wasm pkg/falcon_wasm_bg.wasm
+// FALCON-1024 (FN-DSA-1024): pub 1793B, priv 2305B, sig ≤1462B (variable)
+// Crypto is WASM only — there is no Web Crypto / ECDSA fallback.
 //
-// Browser loading:
-//   • HTTP (online):  `import('./falcon_wasm.js')` + fetch `falcon_wasm_bg.wasm`
-//   • MHTML/file://: inline Uint8Array + WebAssembly.instantiate (see falcon_wasm_inline.js)
-//     MHTML cannot fetch external WASM — embed the inline bundle or use wasm2js fallback.
+// The backend serves the wasm-bindgen bundle:
+//   GET /falcon_wasm.js       → crates/falcon-wasm/pkg/falcon_wasm.js
+//   GET /falcon_wasm_bg.wasm  → crates/falcon-wasm/pkg/falcon_wasm_bg.wasm
+// Rebuild both with crates/falcon-wasm/build.sh after changing the crate.
+//
+// Offline/MHTML copies cannot fetch external WASM (file://), so the page
+// shows a clear banner instead of silently using another algorithm.
 // ═══════════════════════════════════════════════════════════════════
 
 const API_BASE = '';
@@ -327,15 +324,30 @@ async function api(method, path, body) {
   if (sessionToken) {
     opts.headers['Authorization'] = `Bearer ${sessionToken}`;
   }
-  const res = await fetch(API_BASE + path, opts);
-  const data = await res.json();
+
+  let res;
+  try {
+    res = await fetch(API_BASE + path, opts);
+  } catch (e) {
+    return { ok: false, status: 0, data: { error: `network error: ${e.message}` } };
+  }
+
+  // Nginx (429/502) and proxies can return HTML/non-JSON — never let
+  // `res.json()` reject and leave a button stuck in its disabled state.
+  const text = await res.text();
+  let data;
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch {
+    data = { error: text.slice(0, 300) || `HTTP ${res.status}` };
+  }
   return { ok: res.ok, status: res.status, data };
 }
 
 // ── Base64 helpers — chunked to support FALCON-1024 (1793B pub, 2305B priv → ~3KB b64) ──
 // Spread `...Uint8Array` hits the engine's max-arguments limit (V8 ~120K) and will
 // stack-overflow on larger blobs or in other engines. 1793 bytes is borderline but
-// 2305B priv + ~1330B sig must be chunked. 0x8000 = 32KB chunks (conservative).
+// 2305B priv + the signature must be chunked. 0x8000 = 32KB chunks (conservative).
 function bytesToBinary(bytes) {
   const arr = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
   const CHUNK = 0x8000;
@@ -352,19 +364,8 @@ function base64Encode(b) {
 }
 
 function base64Decode(s) {
-  // Accept multi-line PEM bodies: strip all whitespace (including \r\n) before atob
-  s = s.replace(/\s+/g, '');
-  const bin = atob(s);
-  return Uint8Array.from(bin, c => c.charCodeAt(0));
-}
-
-function btoaUrl(b) {
-  return base64Encode(b).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
-
-function atobUrl(s) {
-  s = s.replace(/-/g, '+').replace(/_/g, '/');
-  // allow multi-line / wrapped input
+  // Accept multi-line PEM bodies and missing padding: strip all whitespace
+  // (including \r\n) before atob, then restore the '=' padding.
   s = s.replace(/\s+/g, '');
   while (s.length % 4) s += '=';
   const bin = atob(s);
@@ -382,18 +383,19 @@ function base64Wrap(b64, width = 64) {
 }
 
 // ── FALCON WASM loader ───────────────────────────────────────────
-// FALCON-1024 (logn=10) is the only param the server accepts (auth.rs checks 1793 bytes).
-// We wire `falcon-wasm` via ESM import when served over HTTP, and fall back to a
-// visible banner when offline/MHTML or when the wasm bundle is missing — no silent ECDSA.
+// FALCON-1024 (logn=10) is the only param the server accepts (auth.rs checks
+// 1793 bytes). There is deliberately no ECDSA/Web Crypto path: if the bundle
+// cannot load we surface a blocking banner and refuse to generate or sign.
 let falcon = null;
 let falconReady = false;
 let falconError = null;
+let falconInitPromise = null;
 
-function showFalconBanner(html) {
+function showFalconBanner(message) {
   if (!falconBanner) return;
-  falconBanner.innerHTML = html;
+  // textContent, not innerHTML: the message contains engine error text.
+  falconBanner.textContent = message;
   falconBanner.classList.remove('hidden');
-  falconBanner.style.display = 'block';
 }
 
 function hideFalconBanner() {
@@ -402,105 +404,131 @@ function hideFalconBanner() {
   falconBanner.textContent = '';
 }
 
-async function initFalcon() {
-  // Already ready?
-  if (falconReady && falcon) return true;
-
-  // 1. If an inline bundle is present (MHTML-safe), it should have installed a global.
-  //    `falcon_wasm_inline.js` generated by build.sh exposes `falconWasmBytes`.
-  //    We don't instantiate it here directly — the ESM glue is simpler for the live site.
-  //    Inline path is documented for offline use; the banner explains it when fetch fails.
-
-  // 2. Try ESM + wasm-bindgen bundle (HTTP-served)
+async function loadFalcon() {
   try {
-    // `falcon_wasm.js` is the wasm-bindgen JS glue; it fetches `falcon_wasm_bg.wasm`
-    // relative to itself. Works when this page is served via HTTP with the pkg/ files
-    // copied alongside static/. Fails on file:// (expected) — we show the banner.
+    // `falcon_wasm.js` is the wasm-bindgen glue; its default initializer
+    // fetches `falcon_wasm_bg.wasm` relative to the module URL. Both paths
+    // are served by the backend (see STATIC_ROUTES in src/main.rs).
     const mod = await import('./falcon_wasm.js');
-    // wasm-bindgen `default` is the initializer that fetches/instantiates the wasm
-    if (mod.default) {
-      await mod.default();
-    } else if (mod.initSync) {
-      // alternative entry
-      mod.initSync();
+    if (typeof mod.default !== 'function') {
+      throw new Error('falcon_wasm.js is missing the wasm-bindgen initializer');
     }
-    // verify expected exports are present
+    await mod.default();
     if (typeof mod.generate_keypair !== 'function' || typeof mod.sign !== 'function') {
-      throw new Error('falcon_wasm.js missing generate_keypair/sign exports');
+      throw new Error('falcon_wasm.js is missing generate_keypair/sign exports');
     }
     falcon = mod;
     falconReady = true;
+    falconError = null;
     hideFalconBanner();
     return true;
   } catch (e) {
+    falcon = null;
+    falconReady = false;
     falconError = e?.message || String(e);
-    // Distinguish file:// (MHTML) from HTTP 404 — both need the banner
-    const isFileProtocol = location.protocol === 'file:';
-    const hint = isFileProtocol
-      ? 'Offline/MHTML (file://) cannot fetch external WASM. Embed <code>crates/falcon-wasm/pkg/falcon_wasm_inline.js</code> as an inline <code>Uint8Array</code> + <code>WebAssembly.instantiate</code>, or use the <code>wasm2js</code> fallback per the file header.'
-      : 'Serve <code>backend/crates/falcon-wasm/pkg/falcon_wasm_bg.wasm</code> and <code>falcon_wasm.js</code> alongside this page (e.g. copy <code>pkg/</code> to <code>static/</code>), or embed the inline bundle for MHTML.';
+    const reason = location.protocol === 'file:'
+      ? 'This page was opened from file:// (offline/MHTML) and cannot fetch the WASM bundle.'
+      : 'The backend must serve /falcon_wasm.js and /falcon_wasm_bg.wasm.';
     showFalconBanner(
-      `⚠️ <strong>FALCON WASM not loaded</strong> — ${falconError}.<br>` +
-      `This tool requires <strong>FN-DSA-1024 (FALCON-1024, 1793-byte public keys)</strong>. The server rejects non-1024 keys (<code>auth.rs:88-97</code>).<br>` +
-      hint + ` <a href="https://github.com/monbuticloud/homepage" style="color:var(--lime-cream-500)">Build: crates/falcon-wasm/build.sh</a>`
+      `FALCON WASM not loaded — ${falconError}\n` +
+      'This tool only signs with FN-DSA-1024 (FALCON-1024, 1793-byte public keys). ' +
+      'The server rejects non-1024 keys; no ECDSA fallback is available.\n' +
+      `${reason}\n` +
+      'Rebuild with backend/crates/falcon-wasm/build.sh and serve the pkg/ files from the backend.'
     );
     return false;
   }
 }
 
-// Kick off init in background; UI will await it on first use if still pending
+function initFalcon() {
+  if (falconReady && falcon) return Promise.resolve(true);
+  // Deduplicate concurrent attempts (the page kicks off init at load time and
+  // the first user click may arrive before it finishes).
+  if (!falconInitPromise) {
+    falconInitPromise = loadFalcon().finally(() => {
+      falconInitPromise = null;
+    });
+  }
+  return falconInitPromise;
+}
+
+// Kick off init in background; UI will await it on first use if still pending.
 initFalcon();
 
 // ── Key generation — FALCON-1024 only (1793B pub, 2305B priv) ──────
 async function generateKeypair() {
   // Ensure WASM is ready (await background init if it hasn't finished)
   if (!falconReady) {
-    // Try to (re-)init; if it fails we surface the banner error explicitly
     const ok = await initFalcon();
     if (!ok) {
       throw new Error(
         falconError
-          ? `FALCON WASM not ready: ${falconError}. Cannot generate 1793-byte FALCON-1024 key.`
-          : 'FALCON WASM not loaded — serve falcon_wasm_bg.wasm or embed inline bundle. ECDSA placeholder removed (server requires 1793-byte FALCON-1024).'
+          ? `FALCON WASM not ready: ${falconError}. Cannot generate a 1793-byte FALCON-1024 key.`
+          : 'FALCON WASM not loaded — serve falcon_wasm_bg.wasm or rebuild the pkg/ bundle.'
       );
     }
   }
-  // FALCON-1024 is logn=10 (NIST Level V)
+
+  // FALCON-1024 is logn=10 (NIST Level V). Keygen is CPU-heavy and
+  // synchronous inside WASM; yield once so the status message paints.
+  await new Promise(resolve => setTimeout(resolve, 0));
+
   const kp = falcon.generate_keypair(10);
-  // wasm-bindgen returns { public_key: Uint8Array, private_key: Uint8Array } (snake_case from Rust)
+  // wasm-bindgen returns { public_key: Uint8Array, private_key: Uint8Array }
   const pubKey = kp.public_key ?? kp.publicKey ?? kp[0];
   const privKey = kp.private_key ?? kp.privateKey ?? kp[1];
-  if (!pubKey || !privKey) throw new Error('FALCON generate_keypair returned unexpected shape');
+  if (!pubKey || !privKey) throw new Error('FALCON generate_keypair returned an unexpected shape');
+
   const pub = new Uint8Array(pubKey);
   const priv = new Uint8Array(privKey);
-  if (pub.length !== 1793) {
-    console.warn(`FALCON pub length ${pub.length} != 1793 (expected FN-DSA-1024)`);
+
+  // Refuse to hand a non-FALCON-1024 keypair to the UI — the server only
+  // accepts 1793-byte public keys and verification would fail anyway.
+  if (pub.length !== 1793 || priv.length !== 2305) {
+    throw new Error(
+      `FALCON-1024 key size mismatch: pub ${pub.length}B (want 1793), priv ${priv.length}B (want 2305)`
+    );
   }
+
   return { pubKey: pub, privKey: priv };
 }
 
 async function signNonce(nonceBytes) {
   if (!keypair?.privKey) throw new Error('No key loaded for signing');
+  if (keypair.privKey.length !== 2305) {
+    throw new Error(
+      `Private key is ${keypair.privKey.length}B — FALCON-1024 requires 2305B`
+    );
+  }
   if (!falconReady) {
     const ok = await initFalcon();
-    if (!ok) throw new Error(falconError ? `FALCON WASM not ready: ${falconError}` : 'FALCON WASM not loaded — cannot sign. Load falcon-wasm first.');
+    if (!ok) {
+      throw new Error(
+        falconError ? `FALCON WASM not ready: ${falconError}` : 'FALCON WASM not loaded — cannot sign.'
+      );
+    }
   }
   // falcon.sign(private_key: Uint8Array, message: Uint8Array) -> Uint8Array
   const sig = falcon.sign(keypair.privKey, nonceBytes);
-  return sig instanceof Uint8Array ? sig : new Uint8Array(sig);
+  const out = sig instanceof Uint8Array ? sig : new Uint8Array(sig);
+  if (out.length === 0) throw new Error('FALCON sign returned an empty signature');
+  return out;
 }
 
 // ── Generate ─────────────────────────────────────────────────────
 btnGen.addEventListener('click', async () => {
   const kid = keyId.value.trim();
-  if (!kid) { show(keygenOut, 'Enter a key_id first', 'error'); return; }
+  if (!kid || kid.length > 64) {
+    show(keygenOut, 'key_id must be 1–64 chars', 'error');
+    return;
+  }
 
   btnGen.disabled = true;
-  show(keygenOut, 'Generating FALCON-1024 keypair (1793B pub / 2305B priv) via falcon-wasm...', 'info');
+  show(keygenOut, 'Generating FALCON-1024 keypair (1793B pub / 2305B priv) via falcon-wasm…', 'info');
 
   try {
     keypair = await generateKeypair();
-    show(keygenOut, `✅ FALCON-1024 keypair generated (pub ${keypair.pubKey.length}B)\n` +
+    show(keygenOut, `✅ FALCON-1024 keypair generated (pub ${keypair.pubKey.length}B, priv ${keypair.privKey.length}B)\n` +
       `pub_key b64: ${base64Encode(keypair.pubKey).slice(0, 64)}...`, 'success');
     btnDl.disabled = false;
     btnReg.disabled = false;
@@ -508,11 +536,6 @@ btnGen.addEventListener('click', async () => {
     hideFalconBanner();
   } catch (e) {
     show(keygenOut, `❌ ${e.message}`, 'error');
-    // Ensure banner is visible for wasm-load failures
-    if (falconError && falconBanner?.classList.contains('hidden')) {
-      showFalconBanner(`⚠️ FALCON WASM error: ${falconError}. ` +
-        `Generation failed — ${e.message}. See banner above for setup.`);
-    }
   }
 
   btnGen.disabled = false;
@@ -547,17 +570,20 @@ fileIn.addEventListener('change', async (e) => {
 
   try {
     const text = await file.text();
-    const kidMatch = text.match(/key_id:\s*(.+)/);
+    const kidMatch = text.match(/^key_id:\s*(.+)$/m);
     if (!kidMatch) {
       show(keygenOut, 'Invalid key file: missing key_id', 'error');
       return;
     }
     const kid = kidMatch[1].trim();
+    if (!kid || kid.length > 64) {
+      show(keygenOut, 'Invalid key file: key_id must be 1–64 chars', 'error');
+      return;
+    }
 
-    // --- Multi-line base64 handling (fixes single-line /^[...]+$/m bug) ---
-    // PEM body may be wrapped at 64 chars (3074 chars for 2305B priv), so we must
-    // join all base64 lines between the BEGIN/END markers. The old `match(/^[A-Za-z0-9+/=]+$/m)` 
-    // only captured the first line (~64 chars) and dropped the rest, truncating the key.
+    // PEM body is wrapped at 64 chars (~3076 chars for a 2305B key), so join
+    // every base64 line between the BEGIN/END markers. Matching a single line
+    // (the old `/^[...]+$/m` bug) truncated the key to 48 bytes.
     let b64 = null;
     const pemBlock = text.match(/-----BEGIN HOMEPAGE FALCON KEY-----[\s\S]*?-----END HOMEPAGE FALCON KEY-----/);
     if (pemBlock) {
@@ -565,20 +591,14 @@ fileIn.addEventListener('change', async (e) => {
         .replace(/-----BEGIN HOMEPAGE FALCON KEY-----/, '')
         .replace(/-----END HOMEPAGE FALCON KEY-----/, '')
         // strip metadata lines (key_id, encrypted, salt, nonce)
-        .replace(/key_id:.*(?:\r?\n|$)/g, '')
-        .replace(/encrypted:.*(?:\r?\n|$)/g, '')
-        .replace(/salt:.*(?:\r?\n|$)/g, '')
-        .replace(/nonce:.*(?:\r?\n|$)/g, '');
+        .replace(/^(?:key_id|encrypted|salt|nonce):.*$/gm, '');
       b64 = inner.replace(/\s+/g, '');
     } else {
-      // Fallback for files without PEM markers: collect all base64-looking lines
-      const lines = text.split(/\r?\n/).map(l => l.trim()).filter(l => /^[A-Za-z0-9+/=]+$/.test(l) && l.length >= 4);
-      if (lines.length) b64 = lines.join('');
-      else {
-        // Last resort: try single-line match for backward compat
-        const single = text.match(/[A-Za-z0-9+/=]{64,}/);
-        if (single) b64 = single[0].replace(/\s+/g, '');
-      }
+      // Fallback for files without PEM markers: collect all base64-looking lines.
+      b64 = text.split(/\r?\n/)
+        .map(l => l.trim())
+        .filter(l => /^[A-Za-z0-9+/=]+$/.test(l) && l.length >= 4)
+        .join('');
     }
 
     if (!b64 || !/^[A-Za-z0-9+/=]+$/.test(b64)) {
@@ -588,48 +608,29 @@ fileIn.addEventListener('change', async (e) => {
 
     const privBytes = base64Decode(b64);
 
-    // For FALCON-1024, priv should be 2305 bytes (FN-DSA-1024). Older ECDSA files were PKCS8.
-    // We keep the raw bytes; signing uses falcon.sign(privKey, msg) directly.
-    // Pub derivation from priv requires WASM support (from_private_key); not exposed in current
-    // falcon-wasm bundle, so we keep pub empty and warn — user can re-register after generation.
-    if (privBytes.length !== 2305 && privBytes.length !== 1281) {
-      // 2305 = FN-DSA-1024, 1281 = FN-DSA-512, otherwise likely legacy ECDSA/PKCS8
-      console.warn(`Loaded priv length ${privBytes.length} — expected 2305 (FN-DSA-1024)`);
+    // FALCON-1024 only: FN-DSA-512 (1281B) and legacy ECDSA/PKCS8 keys are
+    // rejected here because the server only accepts 1793-byte public keys.
+    if (privBytes.length !== 2305) {
+      show(keygenOut,
+        `❌ Key is ${privBytes.length}B — FALCON-1024 requires a 2305-byte private key. ` +
+        'FN-DSA-512 and legacy ECDSA keys are not supported by this server.',
+        'error');
+      return;
     }
 
-    keyId.value = kid;
-    // Try to keep pub if we can derive it (requires future wasm export); otherwise leave empty
-    // and let registration prompt the user to generate a new pair.
-    let pubBytes = new Uint8Array(0);
-    // Attempt pub derivation if a helper is available (future: falcon.derive_public)
-    if (falconReady && typeof falcon?.verify === 'function' && privBytes.length === 2305) {
-      // No direct API today — keep placeholder for future `from_private_key` export
-    }
+    keypair = { privKey: privBytes, pubKey: new Uint8Array(0) };
 
-    keypair = {
-      privKey: privBytes,
-      pubKey: pubBytes,
-    };
-
-    // If file was legacy ECDSA PKCS8, warn that it won't register (server wants 1793B)
-    const isLegacy = privBytes.length < 1000 || (b64.length < 2000 && privBytes.length !== 2305 && privBytes.length !== 1281);
-    if (isLegacy && privBytes.length !== 2305) {
-      show(keygenOut, `⚠️ Loaded key "${kid}" (${privBytes.length}B) — legacy/ECDSA size. Server requires FALCON-1024 (1793B pub, 2305B priv); registration will reject this key. Generate a new FALCON-1024 keypair.`, 'error');
-      btnReg.disabled = true;
-    } else {
-      // For FALCON, we loaded priv but have no pub — ask user to generate or handle
-      if (pubBytes.length === 0) {
-        show(keygenOut, `✅ Loaded key for "${kid}" (priv ${privBytes.length}B, FALCON). Pub not in file — generate a new pair to register, or keep this priv for signing if pub already registered.`, 'info');
-        // Don't enable Register until we have a pub; Challenge/Sign can still work if key already registered
-        btnReg.disabled = true;
-      } else {
-        show(keygenOut, `✅ Loaded key for "${kid}" (priv ${privBytes.length}B, pub ${pubBytes.length}B)`, 'success');
-        btnReg.disabled = false;
-      }
-    }
     keyId.value = kid;
     btnDl.disabled = false;
     btnChal.disabled = false;
+    // A .priv file contains only the private key (public derivation is not
+    // exposed by the bundle), so there is nothing new to register.
+    btnReg.disabled = true;
+    show(keygenOut,
+      `✅ Loaded FALCON-1024 private key for "${kid}" (2305B).\n` +
+      'The file has no public key, so Register stays disabled. Signing works if this key_id is already registered; ' +
+      'generate a new pair to register a new key.',
+      'success');
   } catch (e) {
     show(keygenOut, `❌ ${e.message}`, 'error');
   }
@@ -648,18 +649,23 @@ btnReg.addEventListener('click', async () => {
     show(keygenOut, `Pub key is ${keypair.pubKey.length}B — server requires FALCON-1024 (1793B). Generate via falcon-wasm.`, 'error');
     return;
   }
+  const kid = keyId.value.trim();
+  if (!kid || kid.length > 64) {
+    show(keygenOut, 'key_id must be 1–64 chars', 'error');
+    return;
+  }
   btnReg.disabled = true;
-  show(keygenOut, 'Registering FALCON-1024 pub key (1793B)...', 'info');
+  show(keygenOut, 'Registering FALCON-1024 pub key (1793B)…', 'info');
 
   const res = await api('POST', '/api/auth/keys', {
-    key_id: keyId.value.trim(),
+    key_id: kid,
     pub_key: base64Encode(keypair.pubKey),
   });
 
   if (res.ok) {
     show(keygenOut, `✅ Registered "${res.data.key_id}" (FALCON-1024)`, 'success');
   } else {
-    show(keygenOut, `❌ ${res.data.error}`, 'error');
+    show(keygenOut, `❌ ${res.data.error || `HTTP ${res.status}`}`, 'error');
     btnReg.disabled = false;
   }
 });
@@ -667,8 +673,12 @@ btnReg.addEventListener('click', async () => {
 // ── Challenge ────────────────────────────────────────────────────
 btnChal.addEventListener('click', async () => {
   const kid = keyId.value.trim();
+  if (!kid || kid.length > 64) {
+    show(authOut, 'key_id must be 1–64 chars', 'error');
+    return;
+  }
   btnChal.disabled = true;
-  show(authOut, 'Requesting challenge...', 'info');
+  show(authOut, 'Requesting challenge…', 'info');
 
   const res = await api('GET', `/api/auth/challenge?key_id=${encodeURIComponent(kid)}`);
 
@@ -677,7 +687,7 @@ btnChal.addEventListener('click', async () => {
     show(authOut, `✅ Challenge received\nnonce: ${challenge.nonce.slice(0, 32)}...`, 'success');
     btnSign.disabled = false;
   } else {
-    show(authOut, `❌ ${res.data.error}`, 'error');
+    show(authOut, `❌ ${res.data.error || `HTTP ${res.status}`}`, 'error');
     btnChal.disabled = false;
   }
 });
@@ -720,7 +730,7 @@ btnSign.addEventListener('click', async () => {
       show(authOut, `✅ Authorized! Capabilities: ${sessionData.capabilities}`, 'success');
       btnChal.disabled = false;
     } else {
-      show(authOut, `❌ ${res.data.error}`, 'error');
+      show(authOut, `❌ ${res.data.error || `HTTP ${res.status}`}`, 'error');
       btnSign.disabled = false;
       btnChal.disabled = false;
     }
@@ -745,7 +755,7 @@ btnLo.addEventListener('click', async () => {
     btnApi.disabled = true;
     show(authOut, `✅ Logged out all sessions (counter: ${res.data.nonce_counter})`, 'success');
   } else {
-    show(authOut, `❌ ${res.data.error}`, 'error');
+    show(authOut, `❌ ${res.data.error || `HTTP ${res.status}`}`, 'error');
   }
 
   btnLo.disabled = false;

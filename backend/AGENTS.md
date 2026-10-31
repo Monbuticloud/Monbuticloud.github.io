@@ -50,6 +50,7 @@ Rust HTTP server serving portfolio pages, a Lazy SMP chess engine, and FALCON po
 - Tests live in `src/tests/` as a mirror of `src/` (e.g. `src/tests/games/chess/main.rs`), wired via `#[path]`.
 - Log tools (`log_error`, etc.) use `#[allow(dead_code)]` — keep them even if unused.
 - Falcon-wasm build: `crates/falcon-wasm/build.sh` runs `wasm-bindgen` + `wasm-opt -Oz`.
+- Auth tool loads the wasm-bindgen bundle from `/falcon_wasm.js` + `/falcon_wasm_bg.wasm` (`STATIC_ROUTES` → `crates/falcon-wasm/pkg/`; `serve_static` is binary-safe). The Dockerfile copies `crates/falcon-wasm/pkg/` into the image — rebuild it when the crate changes.
 - Session token format: `key_id ‖ salt ‖ HMAC(secret, key_id ‖ salt ‖ nonce_counter ‖ expiry)`.
 - Challenge-nonce replay store (`USED_NONCES`) is process-local memory — single-instance only. Do not scale to multiple replicas without a shared store (see CR-003 note in `src/auth/session.rs`).
 - `.env` is gitignored — never commit secrets.

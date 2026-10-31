@@ -2,14 +2,16 @@
 // for browsers without native support (Firefox <120, Safari <16.5).
 // Source files in backend/static/*.css remain nested (author input);
 // flattened output is written to backend/static/dist/*.css during `docker build`.
+//
+// `stage: false` disables every other preset-env polyfill so the build only
+// flattens nesting; `nesting-rules` is enabled explicitly below.
 module.exports = {
   plugins: [
     require('postcss-preset-env')({
-      stage: 1,
+      stage: false,
       features: {
         'nesting-rules': true,
       },
-      // Preserve other preset-env defaults; only nesting is critical for FE-003.
       autoprefixer: false,
     }),
   ],

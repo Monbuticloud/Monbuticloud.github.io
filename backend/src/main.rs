@@ -165,6 +165,11 @@ const STATIC_ROUTES: &[(&str, &str)] = &[
     ("/projects.css", "static/projects.css"),
     ("/common.js", "static/common.js"),
     ("/common.css", "static/common.css"),
+    // FALCON WASM for the auth tool. The wasm-bindgen bundle is a tracked
+    // build artifact in `crates/falcon-wasm/pkg/`, so it is routed from there
+    // instead of being duplicated into `static/`.
+    ("/falcon_wasm.js", "crates/falcon-wasm/pkg/falcon_wasm.js"),
+    ("/falcon_wasm_bg.wasm", "crates/falcon-wasm/pkg/falcon_wasm_bg.wasm"),
     ("/auth-tool.html", "static/auth.html"),
     ("/auth-tool", "static/auth.html"),
 ];

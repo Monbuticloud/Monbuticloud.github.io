@@ -30,6 +30,9 @@ RUN rm -rf src
 COPY src/ src/
 COPY static/*.html static/*.css static/*.js /static/
 COPY static/assets/ /static/assets/
+# FALCON WASM for the auth tool (tracked build artifacts). Served by
+# STATIC_ROUTES at /falcon_wasm.js and /falcon_wasm_bg.wasm.
+COPY crates/falcon-wasm/pkg/ /crates/falcon-wasm/pkg/
 # Book is embedded in the binary (include_bytes!) — this copy is optional,
 # kept only so OPENING_BOOK=/static/filtered.bin can override at runtime.
 COPY src/games/chess/filtered.bin /static/filtered.bin
@@ -66,6 +69,8 @@ FROM scratch AS runner
 # Copy the fully static binary
 COPY --from=builder /backend /backend
 COPY --from=builder /static static/
+# FALCON WASM (auth tool) — keep the pkg path in sync with STATIC_ROUTES.
+COPY --from=builder /crates/falcon-wasm/pkg /crates/falcon-wasm/pkg
 
 # Add CA certificates here if your app makes outbound HTTPS/TLS calls:
 # RUN apk add --no-cache ca-certificates && cp /etc/ssl/certs/ca-certificates.crt /

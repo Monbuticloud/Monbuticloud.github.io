@@ -23,6 +23,7 @@ Rust HTTP server serving portfolio pages, a Lazy SMP chess engine, and FALCON po
 | `config/` | Infra | `pgdog/` + `postgres/` config files |
 | `docker-compose.yml` | Infra | Nginx + Rust + Postgres + PgDog orchestration |
 | `Dockerfile` | Infra | Multi-stage Rust build + UPX + scratch image |
+| `package.json`, `package-lock.json`, `postcss.config.cjs`, `.stylelintrc.json` | CSS tooling | PostCSS nesting flattening + stylelint (FE-003) |
 | `nginx/` | Infra | Nginx reverse proxy config |
 | `static/` | Frontend | HTML/CSS/JS, portfolio pages, auth tool |
 | `docs/` | Docs | Auth protocol spec (`auth-signing.md`) |
@@ -53,6 +54,8 @@ Rust HTTP server serving portfolio pages, a Lazy SMP chess engine, and FALCON po
 - Session token format: `key_id ‖ salt ‖ HMAC(secret, key_id ‖ salt ‖ nonce_counter ‖ expiry)`.
 - Challenge-nonce replay store (`USED_NONCES`) is process-local memory — single-instance only. Do not scale to multiple replicas without a shared store (see CR-003 note in `src/auth/session.rs`).
 - `.env` is gitignored — never commit secrets.
+- CSS source in `static/*.css` keeps native nesting. The Docker `css-builder` stage flattens it to `static/dist/*.css` with PostCSS (`npm ci && npm run build:css` locally); the runtime image serves only `dist`, falling back to source for local `cargo run`. `static/dist/` is generated and gitignored — never commit it.
+- `.github/workflows/css-lint.yml` runs stylelint + flatten verification; actions are pinned by commit SHA. Broader frontend CI belongs to FE-011.
 
 ## Verification
 
@@ -61,6 +64,8 @@ Rust HTTP server serving portfolio pages, a Lazy SMP chess engine, and FALCON po
 - `cargo clippy` — lint
 - `cargo nextest run` — faster parallel test runner
 - `cargo deny check` — dependency audit
+- `npm ci && npm run build:css` (in `backend/`) — flatten CSS to `static/dist`
+- `npm run lint:css` (in `backend/`) — stylelint correctness + nesting depth
 - Falcon-wasm: `./crates/falcon-wasm/build.sh` produces `pkg/falcon_wasm_bg.wasm` (114KB)
 
 ## Child DOX Index

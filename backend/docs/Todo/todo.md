@@ -19,7 +19,7 @@ Sorted by priority (P) descending. See `Guide.md` for tag rules.
 - Since: 2026-08-27
 - Since commit: 2d2acca
 - File: backend/static/auth.html:341-343, 351-381, 432-433
-- Summary: `generateKeypair`/`signNonce` use Web Crypto ECDSA P-384, but backend now rejects non-1024 FALCON keys (`auth.rs:88-97` requires 1793 bytes) — the UI cannot register. Fix: wire `falcon-wasm` via inline `Uint8Array` + `WebAssembly.instantiate` (or wasm2js) per the file's own TODO; fix `String.fromCharCode(...Uint8Array)` spread (stack overflow at 1793 bytes) and the single-line base64 regex that misses multi-line bodies.
+- Summary: `generateKeypair`/`signNonce` use Web Crypto ECDSA P-384, but the backend rejects non-1024 FALCON keys (`auth.rs:88-97` requires 1793 bytes) — the UI cannot register. Fix: wire `falcon-wasm` via inline `Uint8Array` + `WebAssembly.instantiate` (or wasm2js) per the file's own TODO, and drop the ECDSA path.
 - Status: open
 
 ## [FE-003] CSS Nesting without build step — add image-time flattening
@@ -52,14 +52,34 @@ Sorted by priority (P) descending. See `Guide.md` for tag rules.
 - Summary: Rainbow, terminal intro, command map, interactive terminal, and grid canvas live in one file — violates <50 lines/function and testability. Fix: split per page — small pages stay a single file (e.g. `contact.js`), large pages become a folder (e.g. `pages/index/terminal/`, `pages/index/grid/`); e.g. `rainbow.js` / `terminal/intro.js` / `terminal/commands.js` / `terminal/input.js` / `grid/canvas.js` with explicit `export`s; keep `index.html` as composition root.
 - Status: open
 
-## [FE-006] No Tailwind/Flowbite despite standards
+## [FE-006a] Tailwind v4 build step in Docker
 
 - P: 5
-- B: 2
-- Since: 2026-08-27
-- Since commit: 2d2acca
-- File: backend/static/common.css:4-13, backend/static/\*.html
-- Summary: `ui-styling-standards` mandates Tailwind via `<script src="https://cdn.tailwindcss.com">` + Flowbite, but the repo serves hand-rolled CSS with redundant 8-digit hex `ff` suffixes and only two `@media (max-width:600px)` breakpoints (missing `sm/md/lg/xl/2xl`). Fix: either adopt Tailwind CDN + Flowbite or document an exception in `AGENTS.md`; remove `ff` suffixes and add mobile-first breakpoints tested at 375/768/1024/1440.
+- B: 3
+- Since: 2026-10-24
+- Since commit: cf70536
+- File: backend/Dockerfile:37-54, backend/static/tailwind.input.css, backend/static/\*.html, backend/AGENTS.md
+- Summary: Add `@tailwindcss/cli` to the existing builder-stage Node block and emit `static/tailwind.css` scanned from `static/*.html`, removing the CDN/Flowbite scripts and documenting the build in `backend/AGENTS.md`. Use v4 CSS-first config (`@source`, `@theme` for the palette), skip preflight so the hand-rolled CSS is not reset, pin the CLI version, and share the stage with FE-003 (split from FE-006, 2026-08-27).
+- Status: open
+
+## [FE-011] No frontend verification in CI
+
+- P: 5
+- B: 3
+- Since: 2026-10-24
+- Since commit: cf70536
+- File: .github/workflows/static.yml:39-40, backend/static/\*.html, backend/static/\*.js
+- Summary: CI only uploads `./frontend` to Pages — there is no HTML/CSS lint, accessibility check, or Playwright smoke test, which is why FE-001…FE-010 accumulated unnoticed. Add a CI job (stylelint/HTMLHint + Playwright smoke for index/auth/terminal) alongside the existing Pages deploy.
+- Status: open
+
+## [FE-012] auth.html embeds a 336-line inline script
+
+- P: 5
+- B: 4
+- Since: 2026-10-24
+- Since commit: cf70536
+- File: backend/static/auth.html:264-599
+- Summary: Keygen, signing, base64 helpers, and UI wiring are inlined in a 336-line `<script>` with no module boundary or shared code, making the FALCON rework harder to test. Extract to `auth/*.js` modules loaded with `type="module"`; keep `auth.html` as markup + composition root.
 - Status: open
 
 ## [FE-007] Canvas grid performance + correctness
@@ -82,6 +102,16 @@ Sorted by priority (P) descending. See `Guide.md` for tag rules.
 - Summary: `<img id="hero-img">` has no `src` — broken when JS is disabled; `loadHd()` sets `img.src = hd` then immediately creates `new Image()` and overwrites it on `onload`, causing a double download. Fix: add fallback `src`/`srcset`/`sizes` with `loading="lazy"`, set `img.src` only inside `full.onload`, and hide the `<img>` via `hidden` until ready.
 - Status: open
 
+## [FE-006b] Offload layout and responsive CSS to Tailwind utilities
+
+- P: 4
+- B: 6
+- Since: 2026-10-24
+- Since commit: cf70536
+- File: backend/static/\*.html, backend/static/common.css, backend/static/style.css, backend/static/contact.css, backend/static/projects.css
+- Summary: Replace generic layout, spacing, typography, and breakpoint rules with Tailwind utilities, keeping bespoke pieces (rainbow, terminal, canvas grid, glass, hero split) in `@layer components`; also drop redundant `ff` hex suffixes and add the missing `sm/md/lg/xl/2xl` breakpoints (`style.css:106, 140, 205` are the only three today). Migrate one page at a time, delete the corresponding hand-rolled rules, and close FE-004 once the duplicated blocks are gone (split from FE-006, 2026-08-27).
+- Status: open
+
 ## [FE-009] A11y + SEO nits
 
 - P: 3
@@ -90,6 +120,16 @@ Sorted by priority (P) descending. See `Guide.md` for tag rules.
 - Since commit: 2d2acca
 - File: backend/static/index.html:22, 83-101, 138-145, backend/static/common.css:122-128
 - Summary: Terminal `<input>` has only a placeholder (no `<label>`/`aria-label`); skills use `<div class="skill-card">` instead of `<ul><li>`; canonical/OG URLs hard-code `https://monbuticloud.github.io/` while dev serves from `localhost`/`monvip.dev`; `* { color: var(--body-text) }` overrides SVG `fill: currentColor` intent. Fix: label the input, use list semantics, make canonical/OG host-relative or env-driven, and scope the `*` color to `body`.
+- Status: open
+
+## [FE-013] Rainbow animations run forever offscreen
+
+- P: 3
+- B: 2
+- Since: 2026-10-24
+- Since commit: cf70536
+- File: backend/static/script.js:27, 52-55
+- Summary: Two `setInterval(..., 75)` loops rewrite 30 `backgroundColor` values and `backgroundPosition` continuously, even when the tab is hidden or the section is offscreen. Gate both on `IntersectionObserver` + `visibilitychange`, or replace with a CSS animation.
 - Status: open
 
 ## [FE-010] Repo hygiene — .DS_Store reappeared + Pages placeholder

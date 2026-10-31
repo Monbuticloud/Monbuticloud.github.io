@@ -1,19 +1,25 @@
-# FE-003: CSS flattening stage — Node 20 + postcss-cli + postcss-preset-env
+# FE-003: CSS flattening stage — Node 20 + PostCSS + postcss-preset-env
 # Flattens CSS Nesting Level 1 (e.g. `#name-section { #name-span {} }`,
 # `.glass { &::before }`) from static/*.css → static/dist/*.css.
-# Source files remain nested (author input); flattened output is served.
+# Source files remain nested (author input); only the flattened dist is served.
 FROM node:20-alpine AS css-builder
 WORKDIR /build
-RUN npm install -g postcss postcss-cli postcss-preset-env
+
+# Reproducible install from the committed lockfile — never `npm install`.
+COPY package.json package-lock.json ./
+RUN npm ci --no-audit --no-fund
+
 COPY postcss.config.cjs ./
-COPY static/ ./static/
-RUN mkdir -p ./static/dist && \
-    for f in ./static/*.css; do \
-        postcss "$f" --config ./ --output "./static/dist/$(basename "$f")"; \
+# Only CSS is needed for flattening.
+COPY static/*.css ./static/
+RUN npm run build:css && \
+    for f in ./static/dist/*.css; do \
+        test -s "$f" || { echo "FE-003: empty flattened CSS: $f"; exit 1; }; \
     done && \
-    echo "FE-003: CSS flattening complete" && ls -lh ./static/dist/ && \
-    echo "--- flattened style.css head ---" && head -n 40 ./static/dist/style.css || true && \
-    echo "--- flattened common.css head ---" && head -n 40 ./static/dist/common.css || true
+    if grep -R -n '&' ./static/dist/*.css; then \
+        echo "FE-003: nesting operators remain after flattening"; exit 1; \
+    fi && \
+    ls -lh ./static/dist/
 
 # Build stage
 FROM rust:alpine AS builder
@@ -45,17 +51,15 @@ RUN rm -rf src
 # cargo to re-link the real binary. All compiled dependencies
 # are preserved in the cache.
 COPY src/ src/
-COPY static/*.html static/*.css static/*.js /static/
+COPY static/*.html static/*.js /static/
 COPY static/assets/ /static/assets/
 # Book is embedded in the binary (include_bytes!) — this copy is optional,
 # kept only so OPENING_BOOK=/static/filtered.bin can override at runtime.
 COPY src/games/chess/filtered.bin /static/filtered.bin
 
-# FE-003: Copy flattened CSS from css-builder → /static/dist and
-# overwrite /static/*.css so the served files are flattened output.
-# Keeps source as author input; dist is the served artifact.
+# FE-003: Serve only the flattened CSS. Source CSS stays out of the runtime
+# image, so unflattened nesting cannot be served in production.
 COPY --from=css-builder /build/static/dist /static/dist
-RUN cp /static/dist/*.css /static/ 2>/dev/null || true
 
 # ── Minify static assets (builder stage only — zero impact on final image) ──
 RUN apk add --no-cache nodejs npm && \
@@ -64,7 +68,7 @@ RUN apk add --no-cache nodejs npm && \
         html-minifier-terser --collapse-whitespace --remove-comments \
           --remove-optional-tags -o "$f" "$f" 2>/dev/null || true; \
     done && \
-    for f in /static/*.css /static/dist/*.css; do \
+    for f in /static/dist/*.css; do \
         csso "$f" --output "$f" 2>/dev/null || true; \
     done && \
     for f in /static/*.js; do \

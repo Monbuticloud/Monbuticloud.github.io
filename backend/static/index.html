@@ -112,6 +112,14 @@
           <img
             id="hero-img"
             alt="Laptop screen showing fullstack code with frontend and backend interfaces"
+            src="/static/assets/images/laptop-fullstack-optim_hd.avif"
+            srcset="
+              /static/assets/images/laptop-fullstack-optim_hd.avif 500w,
+              /static/assets/images/laptop-fullstack-optim.avif   1000w
+            "
+            sizes="(max-width: 600px) 100vw, 50vw"
+            loading="lazy"
+            decoding="async"
           />
         </div>
         <div class="terminal-panel">
@@ -415,24 +423,13 @@
           );
         }
 
-        var loaded = false;
-
-        function loadHd() {
-          loaded = true;
-          img.src = "/static/assets/images/laptop-fullstack-optim_hd.avif";
-          var full = new Image();
-          full.onload = function () {
-            img.src = full.src;
-          };
-          full.src = "/static/assets/images/laptop-fullstack-optim.avif";
-        }
-
+        // Responsive src/srcset picks the right asset and the fallback works
+        // without JS; there is no second JS-driven download to race.
         function apply() {
           if (isSlow()) {
             container.classList.add("hero-lowdata");
           } else {
             container.classList.remove("hero-lowdata");
-            if (!loaded) loadHd();
           }
         }
 

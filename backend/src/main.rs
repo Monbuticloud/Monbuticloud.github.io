@@ -153,18 +153,23 @@ const STATIC_ROUTES: &[(&str, &str)] = &[
     ("/", "static/index.html"),
     ("/index", "static/index.html"),
     ("/index.html", "static/index.html"),
-    ("/script.js", "static/script.js"),
     ("/style.css", "static/style.css"),
     ("/contact", "static/contact.html"),
     ("/contact.html", "static/contact.html"),
-    ("/contact.js", "static/contact.js"),
     ("/contact.css", "static/contact.css"),
     ("/projects", "static/projects.html"),
     ("/projects.html", "static/projects.html"),
-    ("/projects.js", "static/projects.js"),
     ("/projects.css", "static/projects.css"),
     ("/common.js", "static/common.js"),
     ("/common.css", "static/common.css"),
+    // FE-005: index page is a composition root; its ES modules live under
+    // `static/pages/index/` and are served individually.
+    ("/pages/index/index.js", "static/pages/index/index.js"),
+    ("/pages/index/rainbow.js", "static/pages/index/rainbow.js"),
+    ("/pages/index/terminal/intro.js", "static/pages/index/terminal/intro.js"),
+    ("/pages/index/terminal/commands.js", "static/pages/index/terminal/commands.js"),
+    ("/pages/index/terminal/input.js", "static/pages/index/terminal/input.js"),
+    ("/pages/index/grid/canvas.js", "static/pages/index/grid/canvas.js"),
     // FALCON WASM for the auth tool. The wasm-bindgen bundle is a tracked
     // build artifact in `crates/falcon-wasm/pkg/`, so it is routed from there
     // instead of being duplicated into `static/`.

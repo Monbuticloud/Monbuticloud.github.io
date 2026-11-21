@@ -1,0 +1,13 @@
+{
+  "extends": ["stylelint-config-recommended"],
+  "rules": {
+    "max-nesting-depth": 4,
+    "no-descending-specificity": null,
+    "at-rule-no-unknown": [
+      true,
+      {
+        "ignoreAtRules": ["view-transition"]
+      }
+    ]
+  }
+}

@@ -1,0 +1,66 @@
+name: CSS Lint & Flatten
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/static/**/*.css"
+      - "backend/.stylelintrc.json"
+      - "backend/postcss.config.cjs"
+      - "backend/package.json"
+      - "backend/package-lock.json"
+      - ".github/workflows/css-lint.yml"
+  pull_request:
+    paths:
+      - "backend/static/**/*.css"
+      - "backend/.stylelintrc.json"
+      - "backend/postcss.config.cjs"
+      - "backend/package.json"
+      - "backend/package-lock.json"
+      - ".github/workflows/css-lint.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: css-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-and-flatten:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Setup Node 20
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - name: Install CSS tooling
+        working-directory: backend
+        run: npm ci --no-audit --no-fund
+      - name: Lint CSS (correctness + nesting depth)
+        working-directory: backend
+        run: npm run lint:css
+      - name: Flatten CSS
+        working-directory: backend
+        run: npm run build:css
+      - name: Verify flattened output
+        working-directory: backend
+        run: |
+          set -eu
+          if grep -R -n '&' static/dist/*.css; then
+            echo "::error::Flattened CSS still contains the '&' nesting operator"
+            exit 1
+          fi
+          for f in static/dist/*.css; do
+            if [ ! -s "$f" ]; then
+              echo "::error::Flattened $f is empty"
+              exit 1
+            fi
+          done
+          git check-ignore static/dist/style.css >/dev/null
+          echo "Flattened CSS verified"

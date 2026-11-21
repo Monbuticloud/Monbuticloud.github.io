@@ -1,0 +1,15 @@
+{
+  "private": true,
+  "description": "CSS tooling for FE-003 — PostCSS nesting flattening and stylelint",
+  "scripts": {
+    "build:css": "postcss static/*.css --dir static/dist --config ./",
+    "lint:css": "stylelint \"static/*.css\" --config .stylelintrc.json"
+  },
+  "devDependencies": {
+    "postcss": "^8.5.6",
+    "postcss-cli": "^11.0.1",
+    "postcss-preset-env": "^10.6.1",
+    "stylelint": "^16.26.1",
+    "stylelint-config-recommended": "^14.0.1"
+  }
+}

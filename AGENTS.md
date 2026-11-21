@@ -98,7 +98,7 @@ Monorepo for Monbuticloud's personal portfolio site and projects.
 |------|-------|-------|
 | `backend/` | Rust server | HTTP routes, chess engine, DB, auth, static assets, Docker infra |
 | `frontend/` | (future) | Client-side UI — not yet implemented |
-| `.github/workflows/` | CI/CD | GitHub Actions: pages deployment from `./frontend` |
+| `.github/workflows/` | CI/CD | GitHub Actions: frontend Pages deployment + backend CSS lint/flatten |
 
 ## Local Contracts
 

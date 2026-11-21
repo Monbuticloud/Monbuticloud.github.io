@@ -16,6 +16,10 @@ backend/.env
 backend/.tmp/
 backend/v
 
+# FE-003: CSS tooling — dependencies and generated flattened CSS
+backend/node_modules/
+backend/static/dist/
+
 # SDD worktrees
 .worktrees/
 

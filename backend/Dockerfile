@@ -1,3 +1,26 @@
+# FE-003: CSS flattening stage — Node 20 + PostCSS + postcss-preset-env
+# Flattens CSS Nesting Level 1 (e.g. `#name-section { #name-span {} }`,
+# `.glass { &::before }`) from static/*.css → static/dist/*.css.
+# Source files remain nested (author input); only the flattened dist is served.
+FROM node:20-alpine AS css-builder
+WORKDIR /build
+
+# Reproducible install from the committed lockfile — never `npm install`.
+COPY package.json package-lock.json ./
+RUN npm ci --no-audit --no-fund
+
+COPY postcss.config.cjs ./
+# Only CSS is needed for flattening.
+COPY static/*.css ./static/
+RUN npm run build:css && \
+    for f in ./static/dist/*.css; do \
+        test -s "$f" || { echo "FE-003: empty flattened CSS: $f"; exit 1; }; \
+    done && \
+    if grep -R -n '&' ./static/dist/*.css; then \
+        echo "FE-003: nesting operators remain after flattening"; exit 1; \
+    fi && \
+    ls -lh ./static/dist/
+
 # Build stage
 FROM rust:alpine AS builder
 
@@ -28,7 +51,7 @@ RUN rm -rf src
 # cargo to re-link the real binary. All compiled dependencies
 # are preserved in the cache.
 COPY src/ src/
-COPY static/*.html static/*.css static/*.js /static/
+COPY static/*.html static/*.js /static/
 COPY static/assets/ /static/assets/
 # FALCON WASM for the auth tool (tracked build artifacts). Served by
 # STATIC_ROUTES at /falcon_wasm.js and /falcon_wasm_bg.wasm.
@@ -37,6 +60,10 @@ COPY crates/falcon-wasm/pkg/ /crates/falcon-wasm/pkg/
 # kept only so OPENING_BOOK=/static/filtered.bin can override at runtime.
 COPY src/games/chess/filtered.bin /static/filtered.bin
 
+# FE-003: Serve only the flattened CSS. Source CSS stays out of the runtime
+# image, so unflattened nesting cannot be served in production.
+COPY --from=css-builder /build/static/dist /static/dist
+
 # ── Minify static assets (builder stage only — zero impact on final image) ──
 RUN apk add --no-cache nodejs npm && \
     npm install -g html-minifier-terser uglify-js csso-cli svgo && \
@@ -44,7 +71,7 @@ RUN apk add --no-cache nodejs npm && \
         html-minifier-terser --collapse-whitespace --remove-comments \
           --remove-optional-tags -o "$f" "$f" 2>/dev/null || true; \
     done && \
-    for f in /static/*.css; do \
+    for f in /static/dist/*.css; do \
         csso "$f" --output "$f" 2>/dev/null || true; \
     done && \
     for f in /static/*.js; do \

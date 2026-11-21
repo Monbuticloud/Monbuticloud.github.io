@@ -22,16 +22,6 @@ Sorted by priority (P) descending. See `Guide.md` for tag rules.
 - Summary: The CSS half landed in 68095f9 — `css-lint.yml` runs stylelint + flatten verification on `static/**/*.css`. Still missing: an HTML lint (HTMLHint) and a Playwright smoke test covering index, terminal and auth, which is why FE-001...FE-010 accumulated unnoticed. `static.yml` still only uploads `./frontend` to Pages, so none of `static/` is verified.
 - Status: open
 
-## [FE-012] auth.html embeds a 336-line inline script
-
-- P: 5
-- B: 4
-- Since: 2026-10-24
-- Since commit: cf70536
-- File: backend/static/auth.html:264-599
-- Summary: Keygen, signing, base64 helpers, and UI wiring are inlined in a 336-line `<script>` with no module boundary or shared code, making the FALCON rework harder to test. Extract to `auth/*.js` modules loaded with `type="module"`; keep `auth.html` as markup + composition root.
-- Status: open
-
 ## [FE-006b] Offload layout and responsive CSS to Tailwind utilities
 
 - P: 4

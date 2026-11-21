@@ -266,3 +266,15 @@ Items moved here from `todo.md` on completion. Keep the original `Since` and
 - Status: closed
 - Closed: 2026-11-21
 - Outcome: Fixed in f90af7c. Verified in `static/pages/index/rainbow.js`: both loops are gated on `IntersectionObserver` + `visibilitychange` rather than being replaced with a CSS animation.
+
+## [FE-012] auth.html embeds a 336-line inline script
+
+- P: 5
+- B: 4
+- Since: 2026-10-24
+- Since commit: cf70536
+- File: backend/static/auth.html:264-599
+- Summary: Keygen, signing, base64 helpers, and UI wiring are inlined in a 336-line `<script>` with no module boundary or shared code, making the FALCON rework harder to test. Extract to `auth/*.js` modules loaded with `type="module"`; keep `auth.html` as markup + composition root.
+- Status: closed
+- Closed: 2026-11-21
+- Outcome: Fixed exactly as proposed — `auth.html` drops the inline `<script>` for `<script type="module" src="./auth/main.js">` and stays the markup composition root. Nine modules under `static/auth/` (571 LOC): `main.js`, `state.js`, `dom.js`, `api.js`, `base64.js`, `falcon.js`, `keygen.js`, `session.js`, `api-panel.js`, all registered in `STATIC_ROUTES` and copied by the Dockerfile. Verified: every relative import resolves and all 18 ids queried by `dom.js` exist in `auth.html`.

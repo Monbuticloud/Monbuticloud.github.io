@@ -52,9 +52,11 @@ RUN rm -rf src
 # are preserved in the cache.
 COPY src/ src/
 COPY static/*.html static/*.js /static/
-# FE-005: nested ES modules for the index page (served via STATIC_ROUTES).
-# These are not passed through uglify-js below; it cannot parse import/export.
+# FE-005/FE-012: nested ES modules for the index and auth pages (served via
+# STATIC_ROUTES). These are not passed through uglify-js below; it cannot
+# parse import/export.
 COPY static/pages/ /static/pages/
+COPY static/auth/ /static/auth/
 COPY static/assets/ /static/assets/
 # FALCON WASM for the auth tool (tracked build artifacts). Served by
 # STATIC_ROUTES at /falcon_wasm.js and /falcon_wasm_bg.wasm.

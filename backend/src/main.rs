@@ -170,6 +170,16 @@ const STATIC_ROUTES: &[(&str, &str)] = &[
     ("/pages/index/terminal/commands.js", "static/pages/index/terminal/commands.js"),
     ("/pages/index/terminal/input.js", "static/pages/index/terminal/input.js"),
     ("/pages/index/grid/canvas.js", "static/pages/index/grid/canvas.js"),
+    // FE-012: auth tool ES modules (composition root is `auth/main.js`).
+    ("/auth/main.js", "static/auth/main.js"),
+    ("/auth/state.js", "static/auth/state.js"),
+    ("/auth/dom.js", "static/auth/dom.js"),
+    ("/auth/base64.js", "static/auth/base64.js"),
+    ("/auth/api.js", "static/auth/api.js"),
+    ("/auth/falcon.js", "static/auth/falcon.js"),
+    ("/auth/keygen.js", "static/auth/keygen.js"),
+    ("/auth/session.js", "static/auth/session.js"),
+    ("/auth/api-panel.js", "static/auth/api-panel.js"),
     // FALCON WASM for the auth tool. The wasm-bindgen bundle is a tracked
     // build artifact in `crates/falcon-wasm/pkg/`, so it is routed from there
     // instead of being duplicated into `static/`.

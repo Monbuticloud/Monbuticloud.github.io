@@ -30,6 +30,7 @@ Rust HTTP server serving portfolio pages, a Lazy SMP chess engine, and FALCON po
 | `docs/specs/` | Docs | Feature design specs (SDD design docs) |
 | `docs/plans/` | Docs | Implementation plans (SDD task briefs) |
 | `docs/Todo/` | Docs | Todo tracking system (Guide.md rules; todo.md open, complete.md done) |
+| `scripts/` | Tooling | `bench-alloc.sh` (orchestrator, `--compare` builds mimalloc + jemalloc variants), `bench-alloc.py` (HTTP latency sampling), `bench-alloc.Dockerfile` (A/B variant builder); `svg-split.py` / `svg-to-symbols.py` (SVG asset prep) |
 
 ## Local Contracts
 

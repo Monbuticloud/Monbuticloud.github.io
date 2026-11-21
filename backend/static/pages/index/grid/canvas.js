@@ -12,10 +12,19 @@ export const PHASE_INTERVAL = 200; // ms
 const lightnessCache = [];
 const gridState = { canvas: null, ctx: null, cellSize: 0, w: 0, h: 0, offsetX: 0, offsetY: 0 };
 const lastPointer = { clientX: -1, clientY: -1 };
+
 let diagonalPhase = 0;
 let prevPhase = 0;
 let lastPhaseTime = 0;
 let rafId = 0;
+let isVisible = !document.hidden;
+let isIntersecting = true;
+let cachedRect = null;
+
+const MOUSE_THROTTLE_MS = 32;
+let lastMouseEventTime = 0;
+let pendingPointer = null;
+let mouseRafPending = false;
 
 export function getDiagonalLightness(row, col, phase = 0) {
   const maxDiagonal = GRID_WIDTH + GRID_HEIGHT - 2;
@@ -43,13 +52,34 @@ export function getGridState() {
   return gridState;
 }
 
+function shouldRender() {
+  return isVisible && isIntersecting && document.visibilityState === "visible";
+}
+
+function scheduleFrame() {
+  if (!shouldRender()) return;
+  if (rafId) cancelAnimationFrame(rafId);
+  rafId = requestAnimationFrame(drawFrame);
+}
+
+function pauseFrame() {
+  if (rafId) {
+    cancelAnimationFrame(rafId);
+    rafId = 0;
+  }
+}
+
 function drawFrame(timestamp) {
+  rafId = 0;
+  if (!shouldRender()) return;
+
   const { ctx, cellSize, w, h, offsetX, offsetY, canvas } = gridState;
   if (!ctx) {
-    rafId = requestAnimationFrame(drawFrame);
+    scheduleFrame();
     return;
   }
 
+  // Advance phase with drift-free timing.
   while (timestamp - lastPhaseTime >= PHASE_INTERVAL) {
     prevPhase = diagonalPhase;
     diagonalPhase = (diagonalPhase + 1) % NUM_PHASES;
@@ -57,10 +87,12 @@ function drawFrame(timestamp) {
   }
   const t = Math.min((timestamp - lastPhaseTime) / PHASE_INTERVAL, 1);
 
+  // Cache the rect once per frame; invalidate on resize/scroll (FE-007).
+  if (!cachedRect) cachedRect = canvas.getBoundingClientRect();
+  const cr = cachedRect;
   let mx = -1;
   let my = -1;
   if (lastPointer.clientX !== -1) {
-    const cr = canvas.getBoundingClientRect();
     mx = lastPointer.clientX - cr.left;
     my = lastPointer.clientY - cr.top;
   }
@@ -100,7 +132,7 @@ function drawFrame(timestamp) {
     }
   }
 
-  rafId = requestAnimationFrame(drawFrame);
+  scheduleFrame();
 }
 
 function debounce(fn, ms) {
@@ -112,7 +144,7 @@ function debounce(fn, ms) {
 }
 
 /**
- * Initialize canvas and animation loop.
+ * Initialize (or re-initialize) the canvas. Leaves event wiring to initGrid.
  * @param {object} [opts]
  * @param {string} [opts.containerId="grid-container"]
  * @returns {{ destroy: () => void } | null}
@@ -148,46 +180,104 @@ export function initCanvas({ containerId = "grid-container" } = {}) {
   gridState.offsetY = 0;
 
   if (lightnessCache.length === 0) buildLightnessCache();
+  cachedRect = canvas.getBoundingClientRect();
   lastPhaseTime = performance.now();
-  cancelAnimationFrame(rafId);
-  rafId = requestAnimationFrame(drawFrame);
+  pauseFrame();
+  if (shouldRender()) rafId = requestAnimationFrame(drawFrame);
 
   return {
     destroy() {
-      cancelAnimationFrame(rafId);
+      pauseFrame();
     },
   };
 }
 
-let resizeHandler = null;
-let mouseHandler = null;
+let activeTeardown = null;
 
 /**
- * Full grid bootstrap — canvas + mouse + resize.
- * Safe to call once per page load.
+ * Full grid bootstrap — canvas + throttled mouse + resize/visibility gating.
+ * Safe to call more than once: the previous instance is torn down first.
  * @param {object} [opts]
  * @param {string} [opts.containerId]
  * @returns {{ destroy: () => void } | null}
  */
 export function initGrid({ containerId = "grid-container" } = {}) {
+  if (activeTeardown) activeTeardown();
+
   const handle = initCanvas({ containerId });
   if (!handle) return null;
 
-  mouseHandler = (e) => {
-    lastPointer.clientX = e.clientX;
-    lastPointer.clientY = e.clientY;
-  };
-  window.addEventListener("mousemove", mouseHandler);
+  const container = document.getElementById(containerId);
 
-  const debounced = debounce(() => initCanvas({ containerId }), 150);
-  resizeHandler = debounced;
-  window.addEventListener("resize", resizeHandler);
+  function onMouseMove(event) {
+    const now = performance.now();
+    if (now - lastMouseEventTime < MOUSE_THROTTLE_MS) {
+      pendingPointer = { x: event.clientX, y: event.clientY };
+      if (!mouseRafPending) {
+        mouseRafPending = true;
+        requestAnimationFrame(() => {
+          mouseRafPending = false;
+          if (pendingPointer) {
+            lastPointer.clientX = pendingPointer.x;
+            lastPointer.clientY = pendingPointer.y;
+            pendingPointer = null;
+            lastMouseEventTime = performance.now();
+          }
+        });
+      }
+      return;
+    }
+    lastMouseEventTime = now;
+    lastPointer.clientX = event.clientX;
+    lastPointer.clientY = event.clientY;
+  }
 
-  return {
-    destroy() {
-      handle.destroy();
-      if (mouseHandler) window.removeEventListener("mousemove", mouseHandler);
-      if (resizeHandler) window.removeEventListener("resize", resizeHandler);
-    },
-  };
+  function onResize() {
+    cachedRect = null;
+    initCanvas({ containerId });
+  }
+
+  function onScroll() {
+    cachedRect = null;
+  }
+
+  function onVisibilityChange() {
+    isVisible = !document.hidden;
+    cachedRect = null;
+    if (shouldRender()) scheduleFrame();
+    else pauseFrame();
+  }
+
+  let observer = null;
+  if (container && "IntersectionObserver" in window) {
+    observer = new IntersectionObserver(
+      (entries) => {
+        isIntersecting = entries[0].isIntersecting;
+        cachedRect = null;
+        if (shouldRender()) scheduleFrame();
+        else pauseFrame();
+      },
+      { threshold: 0 },
+    );
+    observer.observe(container);
+  }
+
+  const debouncedResize = debounce(onResize, 150);
+  window.addEventListener("mousemove", onMouseMove, { passive: true });
+  window.addEventListener("resize", debouncedResize);
+  window.addEventListener("scroll", onScroll, { passive: true });
+  document.addEventListener("visibilitychange", onVisibilityChange);
+
+  function teardown() {
+    window.removeEventListener("mousemove", onMouseMove);
+    window.removeEventListener("resize", debouncedResize);
+    window.removeEventListener("scroll", onScroll);
+    document.removeEventListener("visibilitychange", onVisibilityChange);
+    if (observer) observer.disconnect();
+    handle.destroy();
+    if (activeTeardown === teardown) activeTeardown = null;
+  }
+
+  activeTeardown = teardown;
+  return { destroy: teardown };
 }

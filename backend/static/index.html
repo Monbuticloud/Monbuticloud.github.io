@@ -19,7 +19,7 @@
     <meta name="theme-color" content="#d4f2db" />
 
     <!-- Canonical URL -->
-    <link rel="canonical" href="https://monbuticloud.github.io/" />
+    <link rel="canonical" href="/" />
 
     <!-- Open Graph -->
     <meta
@@ -30,13 +30,10 @@
       property="og:description"
       content="Monbuticloud's personal portfolio — fullstack development specializing in Rust, Python, and backend systems."
     />
-    <meta property="og:url" content="https://monbuticloud.github.io/" />
+    <meta property="og:url" content="/" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Monbuticloud's Hub" />
-    <meta
-      property="og:image"
-      content="https://monbuticloud.github.io/assets/images/laptop-fullstack-optim.avif"
-    />
+    <meta property="og:image" content="/assets/images/laptop-fullstack-optim.avif" />
 
     <!-- Twitter Cards -->
     <meta name="twitter:card" content="summary_large_image" />
@@ -48,10 +45,7 @@
       name="twitter:description"
       content="Monbuticloud's personal portfolio — fullstack development specializing in Rust, Python, and backend systems."
     />
-    <meta
-      name="twitter:image"
-      content="https://monbuticloud.github.io/assets/images/laptop-fullstack-optim.avif"
-    />
+    <meta name="twitter:image" content="/assets/images/laptop-fullstack-optim.avif" />
 
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="/static/assets/favicon.svg" />
@@ -142,7 +136,8 @@
             </div>
           </div>
           <div class="term-input-wrap">
-            <span class="term-input-prompt">&gt;</span>
+            <span class="term-input-prompt" aria-hidden="true">&gt;</span>
+            <label for="term-input" class="visually-hidden">Terminal input</label>
             <input
               type="text"
               id="term-input"
@@ -150,8 +145,13 @@
               placeholder="waiting for intro…"
               autocomplete="off"
               spellcheck="false"
+              aria-label="Terminal input"
+              aria-describedby="term-input-help"
               disabled
             />
+            <span id="term-input-help" class="visually-hidden"
+              >Type a command and press Enter. Try 'help' for available commands.</span
+            >
           </div>
         </div>
       </section>
@@ -193,8 +193,8 @@
 
         <article class="skill-category">
           <h3>Languages</h3>
-          <div class="skill-grid">
-            <div class="skill-card tilt">
+          <ul class="skill-grid">
+            <li class="skill-card tilt">
               <div class="skill-card-head">
                 <span class="skill-name">Rust</span>
                 <span class="skill-badge advanced">Advanced</span>
@@ -205,8 +205,8 @@
                 </div>
                 <span class="comfort-label">Very Comfortable</span>
               </div>
-            </div>
-            <div class="skill-card tilt">
+            </li>
+            <li class="skill-card tilt">
               <div class="skill-card-head">
                 <span class="skill-name">Python</span>
                 <span class="skill-badge advanced">Advanced</span>
@@ -217,8 +217,8 @@
                 </div>
                 <span class="comfort-label">Comfortable</span>
               </div>
-            </div>
-            <div class="skill-card tilt">
+            </li>
+            <li class="skill-card tilt">
               <div class="skill-card-head">
                 <span class="skill-name">C</span>
                 <span class="skill-badge intermediate">Intermediate</span>
@@ -229,8 +229,8 @@
                 </div>
                 <span class="comfort-label">Somewhat Comfortable</span>
               </div>
-            </div>
-            <div class="skill-card tilt">
+            </li>
+            <li class="skill-card tilt">
               <div class="skill-card-head">
                 <span class="skill-name">TypeScript</span>
                 <span class="skill-badge intermediate">Intermediate</span>
@@ -241,8 +241,8 @@
                 </div>
                 <span class="comfort-label">Somewhat</span>
               </div>
-            </div>
-            <div class="skill-card tilt">
+            </li>
+            <li class="skill-card tilt">
               <div class="skill-card-head">
                 <span class="skill-name">JavaScript</span>
                 <span class="skill-badge intermediate">Intermediate</span>
@@ -253,8 +253,8 @@
                 </div>
                 <span class="comfort-label">Not Comfortable</span>
               </div>
-            </div>
-            <div class="skill-card tilt">
+            </li>
+            <li class="skill-card tilt">
               <div class="skill-card-head">
                 <span class="skill-name">C#</span>
                 <span class="skill-badge beginner">Beginner</span>
@@ -265,14 +265,14 @@
                 </div>
                 <span class="comfort-label">Not Comfortable</span>
               </div>
-            </div>
-          </div>
+            </li>
+          </ul>
         </article>
 
         <article class="skill-category">
           <h3>Tools</h3>
-          <div class="skill-grid">
-            <div class="skill-card tilt">
+          <ul class="skill-grid">
+            <li class="skill-card tilt">
               <div class="skill-card-head">
                 <span class="skill-name">Git</span>
                 <span class="skill-badge advanced">Advanced</span>
@@ -283,8 +283,8 @@
                 </div>
                 <span class="comfort-label">Very Comfortable</span>
               </div>
-            </div>
-            <div class="skill-card tilt">
+            </li>
+            <li class="skill-card tilt">
               <div class="skill-card-head">
                 <span class="skill-name">VS Code</span>
                 <span class="skill-badge advanced">Advanced</span>
@@ -295,8 +295,8 @@
                 </div>
                 <span class="comfort-label">Very Comfortable</span>
               </div>
-            </div>
-            <div class="skill-card tilt">
+            </li>
+            <li class="skill-card tilt">
               <div class="skill-card-head">
                 <span class="skill-name">Docker / Compose</span>
                 <span class="skill-badge intermediate">Intermediate</span>
@@ -307,8 +307,8 @@
                 </div>
                 <span class="comfort-label">Comfortable</span>
               </div>
-            </div>
-            <div class="skill-card tilt">
+            </li>
+            <li class="skill-card tilt">
               <div class="skill-card-head">
                 <span class="skill-name">Bash / Zsh</span>
                 <span class="skill-badge intermediate">Intermediate</span>
@@ -319,8 +319,8 @@
                 </div>
                 <span class="comfort-label">Comfortable</span>
               </div>
-            </div>
-            <div class="skill-card tilt">
+            </li>
+            <li class="skill-card tilt">
               <div class="skill-card-head">
                 <span class="skill-name">Figma</span>
                 <span class="skill-badge beginner">Beginner</span>
@@ -331,14 +331,14 @@
                 </div>
                 <span class="comfort-label">Somewhat</span>
               </div>
-            </div>
-          </div>
+            </li>
+          </ul>
         </article>
 
         <article class="skill-category">
           <h3>Programming Concepts</h3>
-          <div class="skill-grid">
-            <div class="skill-card tilt">
+          <ul class="skill-grid">
+            <li class="skill-card tilt">
               <div class="skill-card-head">
                 <span class="skill-name">Type-Driven Design</span>
                 <span class="skill-badge intermediate">Intermediate</span>
@@ -349,8 +349,8 @@
                 </div>
                 <span class="comfort-label">Very Comfortable</span>
               </div>
-            </div>
-            <div class="skill-card tilt">
+            </li>
+            <li class="skill-card tilt">
               <div class="skill-card-head">
                 <span class="skill-name">OOP</span>
                 <span class="skill-badge intermediate">Intermediate</span>
@@ -361,8 +361,8 @@
                 </div>
                 <span class="comfort-label">Comfortable</span>
               </div>
-            </div>
-            <div class="skill-card tilt">
+            </li>
+            <li class="skill-card tilt">
               <div class="skill-card-head">
                 <span class="skill-name">Data Structures</span>
                 <span class="skill-badge intermediate">Intermediate</span>
@@ -373,8 +373,8 @@
                 </div>
                 <span class="comfort-label">Comfortable</span>
               </div>
-            </div>
-            <div class="skill-card tilt">
+            </li>
+            <li class="skill-card tilt">
               <div class="skill-card-head">
                 <span class="skill-name">Databases</span>
                 <span class="skill-badge beginner">Beginner</span>
@@ -385,8 +385,8 @@
                 </div>
                 <span class="comfort-label">Comfortable</span>
               </div>
-            </div>
-          </div>
+            </li>
+          </ul>
         </article>
       </section>
     </main>

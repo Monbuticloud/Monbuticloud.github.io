@@ -63,8 +63,8 @@ is an optional override that falls back to embedded.
 ## Known Good (from this debugging session)
 
 - Book is valid PolyGlot: 193072 bytes, 12067 entries, 9428 unique keys, sorted BE.
-- MD5 of `backend/src/games/chess/filtered.bin` == `./Backend/filtered.bin`
-  (`161deeb387f06d50aa0d2be56d65fad1`).
+- MD5 of the embedded book (`backend/src/games/chess/filtered.bin`):
+  `161deeb387f06d50aa0d2be56d65fad1`.
 - docker build on Alpine failed for `rust-openzl-sys` bindgen (dlopen on musl) — now moot
   (decompression deps removed entirely).
 
@@ -75,5 +75,3 @@ is an optional override that falls back to embedded.
   `OpeningBook` (embedded `BOOK_BYTES`), book probe in `best_move`
 - `backend/src/tests/games/chess/main.rs` — `book_diagnostic` (16-position table),
   `incremental_hash_matches_full_hash`
-- `backend/my_compressor.zlc` — OpenZL compressor config (book was zl-compressed)
-- `./Backend/filtered.bin` — original decompressed book (same MD5 as current copy)

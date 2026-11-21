@@ -25,5 +25,9 @@ backend/static/dist/
 # SDD worktrees
 .worktrees/
 
+# Tooling
+.opencode/
+.pi/
+
 # macOS junk
 .DS_Store

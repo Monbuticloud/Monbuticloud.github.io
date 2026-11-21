@@ -71,14 +71,18 @@ export function appendPowerlineHeader(historyEl, executionTime) {
 }
 
 /**
- * Append an already-escaped HTML line.
+ * Append an output line. Uses textContent so command output cannot inject
+ * HTML (FE-001).
  * @param {HTMLElement} historyEl
- * @param {string} htmlContent
+ * @param {string} text
  */
-export function appendLine(historyEl, htmlContent) {
+export function appendOutputLine(historyEl, text) {
   const lineElement = document.createElement("div");
   lineElement.className = "term-line";
-  lineElement.innerHTML = htmlContent;
+  const span = document.createElement("span");
+  span.className = "output-line";
+  span.textContent = text;
+  lineElement.appendChild(span);
   historyEl.appendChild(lineElement);
 }
 
@@ -89,7 +93,14 @@ export function appendLine(historyEl, htmlContent) {
  */
 export function freezePromptLine(historyEl, typedEl) {
   const typed = typedEl.textContent;
-  appendLine(historyEl, `<span class="prompt">${PROMPT}</span> ${typed}`);
+  const lineElement = document.createElement("div");
+  lineElement.className = "term-line";
+  const promptSpan = document.createElement("span");
+  promptSpan.className = "prompt";
+  promptSpan.textContent = PROMPT;
+  lineElement.appendChild(promptSpan);
+  lineElement.appendChild(document.createTextNode(` ${typed}`));
+  historyEl.appendChild(lineElement);
   typedEl.textContent = "";
 }
 
@@ -136,7 +147,7 @@ export async function runTerminal({ historyEl, typedEl, bodyEl, control, config 
       const outputs = Array.isArray(entry.output) ? entry.output : [entry.output];
       for (const line of outputs) {
         await sleep(outputPause);
-        appendLine(historyEl, `<span class="output-line">${line}</span>`);
+        appendOutputLine(historyEl, line);
       }
     } else {
       freezePromptLine(historyEl, typedEl);

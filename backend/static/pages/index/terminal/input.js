@@ -15,7 +15,10 @@ export function createTerminalInput({ inputEl, historyEl, bodyEl, commandMap }) 
   function appendOutputLine(text) {
     const line = document.createElement("div");
     line.className = "term-line";
-    line.innerHTML = `<span class="output-line">${text}</span>`;
+    const span = document.createElement("span");
+    span.className = "output-line";
+    span.textContent = text;
+    line.appendChild(span);
     historyEl.appendChild(line);
     bodyEl.scrollTop = bodyEl.scrollHeight;
   }
@@ -30,7 +33,11 @@ export function createTerminalInput({ inputEl, historyEl, bodyEl, commandMap }) 
     appendPowerlineHeader(historyEl, timing);
     const line = document.createElement("div");
     line.className = "term-line";
-    line.innerHTML = `<span class="prompt">&gt;</span> ${text}`;
+    const promptSpan = document.createElement("span");
+    promptSpan.className = "prompt";
+    promptSpan.textContent = ">";
+    line.appendChild(promptSpan);
+    line.appendChild(document.createTextNode(` ${text}`));
     historyEl.appendChild(line);
     bodyEl.scrollTop = bodyEl.scrollHeight;
   }

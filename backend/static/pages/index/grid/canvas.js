@@ -121,7 +121,7 @@ export function initCanvas({ containerId = "grid-container" } = {}) {
   const container = document.getElementById(containerId);
   if (!container) return null;
 
-  container.innerHTML = "";
+  container.replaceChildren();
   container.style.contain = "style layout";
 
   const canvas = document.createElement("canvas");

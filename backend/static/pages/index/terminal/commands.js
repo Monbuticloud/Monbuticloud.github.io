@@ -63,7 +63,7 @@ export const commands = {
     description: "Clear the terminal",
     handler(_args, _output) {
       const history = document.getElementById("term-history");
-      if (history) history.innerHTML = "";
+      if (history) history.replaceChildren();
     },
   },
   // Add more commands here as needed

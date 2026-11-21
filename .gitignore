@@ -13,6 +13,8 @@ backend/data/
 backend/.env
 
 # Temp files
+.tmp/
+temp/
 backend/.tmp/
 backend/v
 

@@ -353,143 +353,21 @@
     transform: perspective(800px) rotateX(var(--tilt-x, 0deg))
       rotateY(var(--tilt-y, 0deg)) scale(1.1);
   }
-
-  .skill-card-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.5em;
-    margin-bottom: 0.5em;
-
-    .skill-name {
-      font-weight: var(--weight-700);
-      font-size: 1em;
-      color: var(--wine-plum-500);
-    }
-
-    .skill-badge {
-      font-size: 0.7em;
-      font-weight: var(--weight-500);
-      padding: 0.2em 0.6em;
-      border-radius: 2px;
-      white-space: nowrap;
-      flex-shrink: 0;
-
-      transform-origin: bottom left;
-      transition:
-        transform 0.3s cubic-bezier(0.25, 0.1, 0.25, 1),
-        box-shadow 0.3s cubic-bezier(0.25, 0.1, 0.25, 1);
-
-      &.advanced {
-        background: var(--berry-blush-500);
-        color: #fff;
-
-        &:hover {
-          transform: scale(1.1) translate(3px, -3px);
-          box-shadow:
-            -2px 2px 0 var(--berry-blush-100),
-            -4px 4px 0 var(--berry-blush-600),
-            -6px 6px 0 var(--berry-blush-700);
-        }
-      }
-
-      &.intermediate {
-        background: var(--lime-cream-500);
-        color: var(--wine-plum-900);
-
-        &:hover {
-          transform: scale(1.1) translate(3px, -3px);
-          box-shadow:
-            -2px 2px 0 var(--lime-cream-100),
-            -4px 4px 0 var(--lime-cream-600),
-            -6px 6px 0 var(--lime-cream-700);
-        }
-      }
-
-      &.beginner {
-        background: var(--frosted-mint-600);
-        color: var(--wine-plum-900);
-
-        &:hover {
-          transform: scale(1.1) translate(3px, -3px);
-          box-shadow:
-            -2px 2px 0 var(--frosted-mint-500),
-            -4px 4px 0 var(--frosted-mint-600),
-            -6px 6px 0 var(--frosted-mint-700);
-        }
-      }
-
-      &.expert {
-        background: var(--amber-500);
-        color: #fff;
-
-        &:hover {
-          transform: scale(1.1) translate(3px, -3px);
-          box-shadow:
-            -2px 2px 0 var(--amber-100),
-            -4px 4px 0 var(--amber-500),
-            -6px 6px 0 var(--amber-700);
-        }
-      }
-    }
-
-    .skill-card-head {
-      flex-direction: column;
-      align-items: flex-start;
-    }
-  }
-
-  .comfort-row {
-    display: flex;
-    align-items: center;
-    gap: 0.5em;
-
-    .comfort-bar {
-      flex: 1;
-      height: 6px;
-      background: rgba(0, 0, 0, 0.08);
-      border-radius: 999px;
-      overflow: hidden;
-      min-width: 50px;
-
-      .comfort-fill {
-        height: 100%;
-        border-radius: 999px;
-        background: linear-gradient(
-          90deg,
-          var(--lime-cream-500),
-          var(--lime-cream-700)
-        );
-        transition: width 0.4s ease;
-      }
-
-      .comfort-fill.w-100 {
-        width: 100%;
-      }
-      .comfort-fill.w-80 {
-        width: 80%;
-      }
-      .comfort-fill.w-60 {
-        width: 60%;
-      }
-      .comfort-fill.w-40 {
-        width: 40%;
-      }
-      .comfort-fill.w-20 {
-        width: 20%;
-      }
-    }
-
-    .comfort-label {
-      font-size: 0.7em;
-      color: var(--rosy-taupe-600);
-      white-space: nowrap;
-      flex-shrink: 0;
-    }
-  }
 }
 
-/* ───────── Skill Badge (extracted for use outside cards) ───────── */
+/* ───────── Skill subcomponents — single source (global scope) ───────── */
+/* stylelint --max-duplicate-selectors: 1 — canonical single source for
+   .skill-card-head / .skill-badge / .comfort-*; do not re-declare inside
+   .skill-card. Variants use CSS custom props for DRY hover shadows. */
+
+.skill-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5em;
+  margin-bottom: 0.5em;
+}
+
 .skill-name {
   font-weight: var(--weight-700);
   font-size: 1em;
@@ -507,61 +385,86 @@
   transition:
     transform 0.3s cubic-bezier(0.25, 0.1, 0.25, 1),
     box-shadow 0.3s cubic-bezier(0.25, 0.1, 0.25, 1);
+  background: var(--badge-bg);
+  color: var(--badge-color);
+
+  &:hover {
+    transform: scale(1.1) translate(3px, -3px);
+    box-shadow:
+      -2px 2px 0 var(--badge-shadow-1),
+      -4px 4px 0 var(--badge-shadow-2),
+      -6px 6px 0 var(--badge-shadow-3);
+  }
 
   &.advanced {
-    background: var(--berry-blush-500);
-    color: #fff;
-
-    &:hover {
-      transform: scale(1.1) translate(3px, -3px);
-      box-shadow:
-        -2px 2px 0 var(--berry-blush-100),
-        -4px 4px 0 var(--berry-blush-600),
-        -6px 6px 0 var(--berry-blush-700);
-    }
+    --badge-bg: var(--berry-blush-500);
+    --badge-color: #fff;
+    --badge-shadow-1: var(--berry-blush-100);
+    --badge-shadow-2: var(--berry-blush-600);
+    --badge-shadow-3: var(--berry-blush-700);
   }
 
   &.intermediate {
-    background: var(--lime-cream-500);
-    color: var(--wine-plum-900);
-
-    &:hover {
-      transform: scale(1.1) translate(3px, -3px);
-      box-shadow:
-        -2px 2px 0 var(--lime-cream-100),
-        -4px 4px 0 var(--lime-cream-600),
-        -6px 6px 0 var(--lime-cream-700);
-    }
+    --badge-bg: var(--lime-cream-500);
+    --badge-color: var(--wine-plum-900);
+    --badge-shadow-1: var(--lime-cream-100);
+    --badge-shadow-2: var(--lime-cream-600);
+    --badge-shadow-3: var(--lime-cream-700);
   }
 
   &.beginner {
-    background: var(--frosted-mint-600);
-    color: var(--wine-plum-900);
-
-    &:hover {
-      transform: scale(1.1) translate(3px, -3px);
-      box-shadow:
-        -2px 2px 0 var(--frosted-mint-500),
-        -4px 4px 0 var(--frosted-mint-600),
-        -6px 6px 0 var(--frosted-mint-700);
-    }
+    --badge-bg: var(--frosted-mint-600);
+    --badge-color: var(--wine-plum-900);
+    --badge-shadow-1: var(--frosted-mint-500);
+    --badge-shadow-2: var(--frosted-mint-600);
+    --badge-shadow-3: var(--frosted-mint-700);
   }
 
   &.expert {
-    background: var(--amber-500);
-    color: #fff;
-
-    &:hover {
-      transform: scale(1.1) translate(3px, -3px);
-      box-shadow:
-        -2px 2px 0 var(--amber-100),
-        -4px 4px 0 var(--amber-500),
-        -6px 6px 0 var(--amber-700);
-    }
+    --badge-bg: var(--amber-500);
+    --badge-color: #fff;
+    --badge-shadow-1: var(--amber-100);
+    --badge-shadow-2: var(--amber-500);
+    --badge-shadow-3: var(--amber-700);
   }
 }
 
-/* ───────── Skills Legend / Footer ───────── */
+.comfort-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+}
+
+.comfort-bar {
+  flex: 1;
+  height: 6px;
+  background: rgba(0, 0, 0, 0.08);
+  border-radius: 999px;
+  overflow: hidden;
+  min-width: 50px;
+}
+
+.comfort-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--lime-cream-500), var(--lime-cream-700));
+  transition: width 0.4s ease;
+
+  &.w-100 { width: 100%; }
+  &.w-80 { width: 80%; }
+  &.w-60 { width: 60%; }
+  &.w-40 { width: 40%; }
+  &.w-20 { width: 20%; }
+}
+
+.comfort-label {
+  font-size: 0.7em;
+  color: var(--rosy-taupe-600);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* ───────── Skills Legend / Footer — single source ───────── */
 .skills-legend {
   margin-top: 2.5em;
   padding: 1.4em 1.6em;
@@ -617,72 +520,6 @@
 }
 
 .skills-legend .legend-note i {
-  color: var(--berry-blush-500);
-  font-size: 1.1em;
-  flex-shrink: 0;
-}
-
-.legend-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1.5em 3em;
-  align-items: flex-start;
-}
-
-.legend-section {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5em;
-}
-
-.legend-title {
-  font-size: 0.75em;
-  font-weight: var(--weight-700);
-  color: var(--rosy-taupe-700);
-  text-transform: uppercase;
-  letter-spacing: 0.8px;
-}
-
-.legend-badges {
-  display: flex;
-  gap: 0.5em;
-  flex-wrap: wrap;
-}
-
-.legend-comfort {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4em;
-  min-width: 200px;
-}
-
-.legend-comfort-bar {
-  height: 6px;
-  background: rgba(0, 0, 0, 0.08);
-  border-radius: 999px;
-  overflow: hidden;
-}
-
-.legend-comfort-labels {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.7em;
-  color: var(--rosy-taupe-600);
-}
-
-.legend-disclaimer {
-  width: 100%;
-  margin-top: 0.8em;
-  padding-top: 0.8em;
-  border-top: 1px solid rgba(255, 255, 255, 0.25);
-  display: flex;
-  align-items: center;
-  gap: 0.5em;
-  font-size: 0.8em;
-  color: var(--rosy-taupe-600);
-}
-
-.legend-disclaimer i {
   color: var(--berry-blush-500);
   font-size: 1.1em;
   flex-shrink: 0;

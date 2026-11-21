@@ -74,8 +74,6 @@ export function initRainbow({
     nameSection.appendChild(segment);
   }
 
-  const barTimer = setInterval(shiftBg, intervalMs, nameSection);
-
   // Text clip gradient
   const stops = buildRainbowStops(numSegments, segmentWidthPx);
   const totalWidth = numSegments * segmentWidthPx;
@@ -84,15 +82,68 @@ export function initRainbow({
   nameSpan.style.backgroundRepeat = "repeat-x";
 
   let offset = 0;
-  const textTimer = setInterval(() => {
+  let barTimer = null;
+  let textTimer = null;
+  let isVisible = !document.hidden;
+  let isIntersecting = true;
+
+  function tickBar() {
+    shiftBg(nameSection);
+  }
+
+  function tickText() {
     offset = (offset - segmentWidthPx) % totalWidth;
     nameSpan.style.backgroundPosition = `${offset}px 0`;
-  }, intervalMs);
+  }
+
+  function start() {
+    if (barTimer === null) barTimer = setInterval(tickBar, intervalMs);
+    if (textTimer === null) textTimer = setInterval(tickText, intervalMs);
+  }
+
+  function stop() {
+    if (barTimer !== null) {
+      clearInterval(barTimer);
+      barTimer = null;
+    }
+    if (textTimer !== null) {
+      clearInterval(textTimer);
+      textTimer = null;
+    }
+  }
+
+  // FE-013: only animate while the hero is visible and on-screen.
+  function sync() {
+    if (isVisible && isIntersecting) start();
+    else stop();
+  }
+
+  function onVisibilityChange() {
+    isVisible = !document.hidden;
+    sync();
+  }
+
+  document.addEventListener("visibilitychange", onVisibilityChange);
+
+  let observer = null;
+  if ("IntersectionObserver" in window) {
+    observer = new IntersectionObserver(
+      (entries) => {
+        isIntersecting = entries[0].isIntersecting;
+        sync();
+      },
+      { threshold: 0 },
+    );
+    observer.observe(nameSection);
+  }
+
+  sync();
 
   return {
     destroy() {
-      clearInterval(barTimer);
-      clearInterval(textTimer);
+      stop();
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      if (observer) observer.disconnect();
     },
   };
 }

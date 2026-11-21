@@ -2,6 +2,9 @@
 # Flattens CSS Nesting Level 1 (e.g. `#name-section { #name-span {} }`,
 # `.glass { &::before }`) from static/*.css → static/dist/*.css.
 # Source files remain nested (author input); only the flattened dist is served.
+# FE-006a: the same stage builds the Tailwind v4 utilities (tailwind.input.css
+# → static/dist/tailwind.css). Preflight is excluded there, so the hand-rolled
+# CSS is not reset.
 FROM node:20-alpine AS css-builder
 WORKDIR /build
 
@@ -10,15 +13,21 @@ COPY package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund
 
 COPY postcss.config.cjs ./
-# Only CSS is needed for flattening.
-COPY static/*.css ./static/
+# FE-006a: the Tailwind input sits at the backend root rather than in static/,
+# so the `static/*.css` glob stays author-CSS only. Its `@source` scans
+# static/*.html, so the markup must be present for utility detection.
+COPY tailwind.input.css ./
+COPY static/*.css static/*.html ./static/
 RUN npm run build:css && \
     for f in ./static/dist/*.css; do \
         test -s "$f" || { echo "FE-003: empty flattened CSS: $f"; exit 1; }; \
     done && \
-    if grep -R -n '&' ./static/dist/*.css; then \
-        echo "FE-003: nesting operators remain after flattening"; exit 1; \
-    fi && \
+    for f in ./static/dist/*.css; do \
+        case "$f" in *tailwind.css) continue;; esac; \
+        if grep -n '&' "$f"; then \
+            echo "FE-003: nesting operators remain after flattening: $f"; exit 1; \
+        fi; \
+    done && \
     ls -lh ./static/dist/
 
 # Build stage

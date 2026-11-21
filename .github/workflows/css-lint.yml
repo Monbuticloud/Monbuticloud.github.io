@@ -1,4 +1,14 @@
-name: CSS Lint & Flatten
+# Lint only. CSS generation is a build-time concern, not a CI concern:
+#
+#   - PostCSS nesting flatten (FE-003) and the Tailwind v4 utilities (FE-006a)
+#     both run in the Dockerfile's `css-builder` stage, which also verifies the
+#     output is non-empty and free of leftover `&` nesting operators.
+#   - `static/dist/` is generated and gitignored, so there is no artifact for
+#     CI to check in.
+#
+# Keep this workflow to checks that read the source: adding a build step here
+# would duplicate the Docker build without producing anything anyone consumes.
+name: CSS Lint
 
 on:
   push:
@@ -28,7 +38,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  lint-and-flatten:
+  lint:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -45,22 +55,3 @@ jobs:
       - name: Lint CSS (correctness + nesting depth)
         working-directory: backend
         run: npm run lint:css
-      - name: Flatten CSS
-        working-directory: backend
-        run: npm run build:css
-      - name: Verify flattened output
-        working-directory: backend
-        run: |
-          set -eu
-          if grep -R -n '&' static/dist/*.css; then
-            echo "::error::Flattened CSS still contains the '&' nesting operator"
-            exit 1
-          fi
-          for f in static/dist/*.css; do
-            if [ ! -s "$f" ]; then
-              echo "::error::Flattened $f is empty"
-              exit 1
-            fi
-          done
-          git check-ignore static/dist/style.css >/dev/null
-          echo "Flattened CSS verified"

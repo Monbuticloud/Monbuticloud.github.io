@@ -1,0 +1,85 @@
+/* FE-006a — Tailwind v4 input.
+ *
+ * Compiled by `npm run build:tailwind` into `static/dist/tailwind.css`, which
+ * `src/api/html.rs` serves in preference to a source file of the same name
+ * (the FE-003 contract: generated CSS lives in the gitignored `static/dist/`).
+ *
+ * This file deliberately lives at the backend root, NOT in `static/`: the
+ * `static/*.css` glob is consumed by both postcss (`build:flatten`) and
+ * stylelint (`lint:css`), and this file's `@theme`/`@source`/layered `@import`
+ * would be flattened into junk output and rejected by `at-rule-no-unknown`.
+ *
+ * Preflight is deliberately NOT imported. The hand-rolled CSS in common.css,
+ * style.css, contact.css and projects.css must not be reset by Tailwind's base
+ * layer; only real utilities are pulled in. `theme.css` is imported instead of
+ * `tailwindcss` so both the vendor base styles and the default theme's
+ * breakpoints (sm 640 / md 768 / lg 1024 / xl 1280 / 2xl 1536) are available.
+ *
+ * Usage: `@import "tailwindcss"` is intentionally absent — add utilities in
+ * markup and let `@source` below find them.
+ */
+@layer theme, components, utilities;
+
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+
+/* Only markup in static/*.html is scanned, so unused utilities are never
+ * emitted. Nested page modules under static/pages/ and static/auth/ are JS, not
+ * markup, so their classes come from these HTML files. */
+@source "./static/*.html";
+
+@theme {
+  /* ───────── Frosted Mint — Surface ───────── */
+  --color-frosted-mint-100: #edf9f0; /* Surface/light */
+  --color-frosted-mint-500: #d4f2db; /* Surface/background — OG */
+  --color-frosted-mint-600: #b8e0b1; /* Surface/hover */
+  --color-frosted-mint-700: #9cd089; /* Surface/active */
+  --color-frosted-mint-900: #7bbf6f; /* Surface/pressed */
+
+  /* ───────── Lime Cream — Accent ───────── */
+  --color-lime-cream-100: #e5fcca; /* Accent/light */
+  --color-lime-cream-500: #cef7a0; /* Accent/highlight — OG */
+  --color-lime-cream-600: #b6eb7c; /* Accent/hover */
+  --color-lime-cream-700: #9bdd5c; /* Accent/active */
+  --color-lime-cream-900: #7fc042; /* Accent/pressed */
+
+  /* ───────── Rosy Taupe — Muted ───────── */
+  --color-rosy-taupe-100: #d8c1bc; /* Muted/light */
+  --color-rosy-taupe-500: #ba9790; /* Muted/support — OG */
+  --color-rosy-taupe-600: #a9827a; /* Muted/hover */
+  --color-rosy-taupe-700: #966c64; /* Muted/active */
+  --color-rosy-taupe-900: #7d5650; /* Muted/pressed */
+
+  /* ───────── Berry Blush — Primary ───────── */
+  --color-berry-blush-100: #b6789d; /* Primary/light */
+  --color-berry-blush-500: #914d76; /* Primary/brand — OG */
+  --color-berry-blush-600: #7d4065; /* Primary/hover */
+  --color-berry-blush-700: #693454; /* Primary/active */
+  --color-berry-blush-900: #542843; /* Primary/pressed */
+
+  /* ───────── Wine Plum — Dark ───────── */
+  --color-wine-plum-100: #87505b; /* Dark/light */
+  --color-wine-plum-500: #69353f; /* Dark/base — OG */
+  --color-wine-plum-600: #592c35; /* Dark/hover */
+  --color-wine-plum-700: #49242b; /* Dark/active */
+  --color-wine-plum-900: #391b21; /* Dark/pressed */
+
+  /* ───────── Warm Amber — Expert ─────────
+   * Named `warm-amber`, not `amber`: Tailwind's default theme already defines
+   * `--color-amber-*`, and overriding only the five design shades would leave
+   * Tailwind's 50/200/300/400/800/950 in place alongside them. */
+  --color-warm-amber-100: #e3c07a; /* Expert/light */
+  --color-warm-amber-500: #c9953b; /* Expert/brand — OG */
+  --color-warm-amber-600: #b88630; /* Expert/hover */
+  --color-warm-amber-700: #a87826; /* Expert/active */
+  --color-warm-amber-900: #8a621d; /* Expert/pressed */
+
+  /* ───────── Semantic aliases ─────────
+   * Mirror common.css's `--Primary`/`--Secondary`/`--Tertiary` and the
+   * `--body-text`/`--body-bg` pair so utilities can express intent. */
+  --color-primary: var(--color-berry-blush-500);
+  --color-secondary: var(--color-wine-plum-500);
+  --color-tertiary: var(--color-warm-amber-500);
+  --color-body-text: var(--color-wine-plum-500);
+  --color-body-bg: var(--color-frosted-mint-500);
+}

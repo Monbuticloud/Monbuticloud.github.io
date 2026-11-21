@@ -181,7 +181,7 @@ Items moved here from `todo.md` on completion. Keep the original `Since` and
 - Summary: Raw CSS Nesting Level 1 (`#name-section { #name-span {} }`, `.image-split { > div:nth-child(1) { img {} } }`, `.glass { &::before }`) is served as plain CSS and drops entirely in Firefox <120/Safari <16.5. Fix at **image build time**: add a Docker stage (Node 20 + `postcss-cli` + `postcss-preset-env` or `lightningcss`) that flattens `static/*.css` → `static/dist/*.css` during `docker build` and serves the dist output; add CI stylelint with a nesting check and keep the source files as authors' input.
 - Status: closed
 - Closed: 2026-08-27
-- Outcome: Fixed in bffcbe4 (image-time PostCSS flattening) plus 68095f9 (CI stylelint + flatten verification). `postcss.config.cjs`, the `build:css`/`lint:css` scripts, the `css-builder` Docker stage and `.github/workflows/css-lint.yml` are all on main; `static/dist/` remains gitignored and the source files stay nested for authors.
+- Outcome: Fixed in bffcbe4 (image-time PostCSS flattening) plus 68095f9 (CI stylelint + flatten verification). `postcss.config.cjs`, the `build:css`/`lint:css` scripts, the `css-builder` Docker stage and `.github/workflows/css-lint.yml` are all on main; `static/dist/` remains gitignored and the source files stay nested for authors. Note (2026-11-21): the flatten verification was later taken out of CI — generation and its output checks now live only in the Docker `css-builder` stage, and `css-lint.yml` lints alone.
 
 ## [FE-004] Massive DRY violation — 140+ lines duplicated
 
@@ -278,3 +278,15 @@ Items moved here from `todo.md` on completion. Keep the original `Since` and
 - Status: closed
 - Closed: 2026-11-21
 - Outcome: Fixed exactly as proposed — `auth.html` drops the inline `<script>` for `<script type="module" src="./auth/main.js">` and stays the markup composition root. Nine modules under `static/auth/` (571 LOC): `main.js`, `state.js`, `dom.js`, `api.js`, `base64.js`, `falcon.js`, `keygen.js`, `session.js`, `api-panel.js`, all registered in `STATIC_ROUTES` and copied by the Dockerfile. Verified: every relative import resolves and all 18 ids queried by `dom.js` exist in `auth.html`.
+
+## [FE-006a] Tailwind v4 build step in Docker
+
+- P: 5
+- B: 3
+- Since: 2026-10-24
+- Since commit: cf70536
+- File: backend/Dockerfile:37-54, backend/static/tailwind.input.css, backend/static/\*.html, backend/AGENTS.md
+- Summary: Add `@tailwindcss/cli` to the existing builder-stage Node block and emit `static/tailwind.css` scanned from `static/*.html`, removing the CDN/Flowbite scripts and documenting the build in `backend/AGENTS.md`. Use v4 CSS-first config (`@source`, `@theme` for the palette), skip preflight so the hand-rolled CSS is not reset, pin the CLI version, and share the stage with FE-003 (split from FE-006, 2026-08-27).
+- Status: closed
+- Closed: 2026-11-21
+- Outcome: Landed, with two premises corrected. (1) There was no CDN or Flowbite markup to remove — main never had Tailwind; the `cdn.tailwindcss.com` tags exist only on the unmerged `fix/FE-006` branch (b361f72). (2) The input went to `backend/tailwind.input.css`, not `static/tailwind.input.css`, because `static/*.css` is globbed by both postcss (`build:flatten`) and stylelint (`lint:css`) — an input there would be flattened into junk output and rejected by `at-rule-no-unknown`. `@tailwindcss/cli` is pinned exactly at 4.3.5; preflight is excluded by importing `tailwindcss/theme.css` + `tailwindcss/utilities.css` instead of `tailwindcss`; `@theme` mirrors the palette minus the redundant `ff` suffixes, with the amber family renamed `warm-amber` to avoid colliding with Tailwind's own `--color-amber-*`. Output is `static/dist/tailwind.css`, per the FE-003 dist contract; `build:css` now runs `build:tailwind` + `build:flatten`. Removal of the flatten steps from CI (they belong to the build) is recorded in FE-003's outcome. Verified: `npm run build:css` from a clean `dist/`, `npm run lint:css` clean, Dockerfile `css-builder` checks replayed locally, `sh -n` on the RUN body. NOT verified: a real `docker build` — no daemon was running.

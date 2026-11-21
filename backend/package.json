@@ -1,11 +1,14 @@
 {
   "private": true,
-  "description": "CSS tooling for FE-003 — PostCSS nesting flattening and stylelint",
+  "description": "CSS tooling — PostCSS nesting flattening (FE-003), Tailwind v4 utilities (FE-006a), stylelint",
   "scripts": {
-    "build:css": "postcss static/*.css --dir static/dist --config ./",
+    "build:tailwind": "tailwindcss -i tailwind.input.css -o static/dist/tailwind.css",
+    "build:flatten": "postcss static/*.css --dir static/dist --config ./",
+    "build:css": "npm run build:tailwind && npm run build:flatten",
     "lint:css": "stylelint \"static/*.css\" --config .stylelintrc.json"
   },
   "devDependencies": {
+    "@tailwindcss/cli": "4.3.5",
     "postcss": "^8.5.6",
     "postcss-cli": "^11.0.1",
     "postcss-preset-env": "^10.6.1",

@@ -22,6 +22,12 @@ backend/v
 backend/node_modules/
 backend/static/dist/
 
+# FE-011: Playwright smoke-test artifacts
+backend/test-results/
+backend/playwright-report/
+backend/blob-report/
+backend/.playwright/
+
 # SDD worktrees
 .worktrees/
 

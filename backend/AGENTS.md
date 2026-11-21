@@ -57,7 +57,7 @@ Rust HTTP server serving portfolio pages, a Lazy SMP chess engine, and FALCON po
 - Challenge-nonce replay store (`USED_NONCES`) is process-local memory — single-instance only. Do not scale to multiple replicas without a shared store (see CR-003 note in `src/auth/session.rs`).
 - `.env` is gitignored — never commit secrets.
 - CSS generation happens only in the Docker `css-builder` stage. PostCSS flattens native nesting from `static/*.css` into `static/dist/*.css`, and the Tailwind v4 CLI compiles `tailwind.input.css` into `static/dist/tailwind.css`. The Tailwind input sits at the backend root, not in `static/`, so the `static/*.css` glob stays author-CSS only. Pages link bare names (`style.css`, `tailwind.css`); `src/api/html.rs` prefers `dist` over the source file and falls back for local `cargo run`. `static/dist/` is generated and gitignored — never commit it.
-- `.github/workflows/css-lint.yml` runs `lint:css` and nothing else — CSS generation and its output checks stay in the Docker build so CI does not duplicate it. Actions are pinned by commit SHA. Broader frontend CI belongs to FE-011.
+- CSS and page checks are split across two workflows, both read-only and both pinned by commit SHA. `.github/workflows/css-lint.yml` runs `lint:css` and nothing else — CSS generation and its output checks stay in the Docker build so CI does not duplicate them. `.github/workflows/frontend-verify.yml` runs `lint:html` (HTMLHint) plus the Playwright smoke suite in Chromium over all four pages.
 
 ## Verification
 
@@ -68,6 +68,8 @@ Rust HTTP server serving portfolio pages, a Lazy SMP chess engine, and FALCON po
 - `cargo deny check` — dependency audit
 - `npm ci && npm run build:css` (in `backend/`) — build `static/dist/` (Tailwind utilities + flattened nesting); `build:tailwind` and `build:flatten` run the halves separately
 - `npm run lint:css` (in `backend/`) — stylelint correctness + nesting depth
+- `npm run lint:html` (in `backend/`) — HTMLHint over `static/*.html`, config in `.htmlhintrc`
+- `npm run test:e2e` (in `backend/`) — Playwright smoke: every page loads without an uncaught exception, the terminal answers `help`, `echo` keeps markup inert, and the auth modules boot; first run needs `npx playwright install chromium`
 - Falcon-wasm: `./crates/falcon-wasm/build.sh` produces `pkg/falcon_wasm_bg.wasm` (114KB)
 
 ## Child DOX Index

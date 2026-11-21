@@ -1,14 +1,19 @@
 {
   "private": true,
-  "description": "CSS tooling — PostCSS nesting flattening (FE-003), Tailwind v4 utilities (FE-006a), stylelint",
+  "description": "Frontend tooling — PostCSS nesting flattening (FE-003), Tailwind v4 utilities (FE-006a), stylelint, HTMLHint, Playwright smoke (FE-011)",
   "scripts": {
     "build:tailwind": "tailwindcss -i tailwind.input.css -o static/dist/tailwind.css",
     "build:flatten": "postcss static/*.css --dir static/dist --config ./",
     "build:css": "npm run build:tailwind && npm run build:flatten",
-    "lint:css": "stylelint \"static/*.css\" --config .stylelintrc.json"
+    "lint:css": "stylelint \"static/*.css\" --config .stylelintrc.json",
+    "lint:html": "htmlhint \"static/*.html\"",
+    "lint": "npm run lint:css && npm run lint:html",
+    "test:e2e": "playwright test"
   },
   "devDependencies": {
+    "@playwright/test": "^1.65.1",
     "@tailwindcss/cli": "4.3.5",
+    "htmlhint": "^1.9.2",
     "postcss": "^8.5.6",
     "postcss-cli": "^11.0.1",
     "postcss-preset-env": "^10.6.1",

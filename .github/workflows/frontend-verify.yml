@@ -1,0 +1,81 @@
+# Frontend verification for the pages under backend/static (FE-011).
+#
+# Two jobs, both reading the source tree only — no build, no artifact:
+#   - lint-html: HTMLHint over static/*.html
+#   - smoke:     Playwright loads every page in Chromium and asserts it renders
+#                and boots. This is the check that would have caught FE-001
+#                (terminal XSS), FE-002 (ECDSA/FALCON mismatch in auth) and
+#                FE-008 (hero broken without JS) before they shipped.
+#
+# css-lint.yml stays CSS-only. CSS generation is a build concern and runs in the
+# Dockerfile's css-builder stage, not here.
+name: Frontend Verify
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/static/**"
+      - "backend/e2e/**"
+      - "backend/.htmlhintrc"
+      - "backend/playwright.config.js"
+      - "backend/package.json"
+      - "backend/package-lock.json"
+      - ".github/workflows/frontend-verify.yml"
+  pull_request:
+    paths:
+      - "backend/static/**"
+      - "backend/e2e/**"
+      - "backend/.htmlhintrc"
+      - "backend/playwright.config.js"
+      - "backend/package.json"
+      - "backend/package-lock.json"
+      - ".github/workflows/frontend-verify.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: frontend-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-html:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Setup Node 20
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - name: Install frontend tooling
+        working-directory: backend
+        run: npm ci --no-audit --no-fund
+      - name: Lint HTML
+        working-directory: backend
+        run: npm run lint:html
+
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Setup Node 20
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - name: Install frontend tooling
+        working-directory: backend
+        run: npm ci --no-audit --no-fund
+      - name: Install Chromium
+        working-directory: backend
+        run: npx playwright install --with-deps chromium
+      - name: Smoke-test the pages
+        working-directory: backend
+        run: npm run test:e2e

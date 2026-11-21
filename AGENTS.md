@@ -98,7 +98,7 @@ Monorepo for Monbuticloud's personal portfolio site and projects.
 |------|-------|-------|
 | `backend/` | Rust server | HTTP routes, chess engine, DB, auth, static assets, Docker infra |
 | `frontend/` | (future) | Client-side UI — not yet implemented |
-| `.github/workflows/` | CI/CD | GitHub Actions: frontend Pages deployment + backend CSS lint |
+| `.github/workflows/` | CI/CD | GitHub Actions: frontend Pages deployment + backend CSS lint + frontend verification (HTMLHint, Playwright) |
 
 ## Local Contracts
 
@@ -124,6 +124,7 @@ Monorepo for Monbuticloud's personal portfolio site and projects.
 - `cargo deny check` — dependency audit (config at `backend/deny.toml`, cargo-deny 0.19 schema)
 - `cargo nextest run` — faster test runner (config at `backend/.config/nextest.toml`)
 - `wasm-opt` + `wasm-bindgen` for falcon-wasm builds (`crates/falcon-wasm/build.sh`)
+- `npm run lint` + `npm run test:e2e` (in `backend/`) — CSS/HTML lint and the Playwright page smoke suite
 
 ## Child DOX Index
 

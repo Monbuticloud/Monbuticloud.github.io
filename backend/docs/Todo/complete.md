@@ -253,7 +253,7 @@ Items moved here from `todo.md` on completion. Keep the original `Since` and
 - Summary: Glob found three `.DS_Store` files (untracked, gitignored since `2be4f02` but still on disk). `frontend/` is NOT the real frontend — `backend/static` is (served via Nginx; `frontend/` is just the GitHub Pages placeholder per `AGENTS.md`). Fix: `trash` the three `.DS_Store`s; update `frontend/index.html` copy to make the placeholder role explicit (link to the real site) or add `frontend/AGENTS.md` documenting the split.
 - Status: closed
 - Closed: 2026-08-27
-- Outcome: Fixed in 1a7d93d, taking the copy branch of the fix: `frontend/index.html` now states it is not the real frontend, points at `backend/static/`, and links the live site, so no `frontend/AGENTS.md` is needed while the folder stays a placeholder. All three `static/` `.DS_Store` files are gone; four unrelated `.DS_Store` files elsewhere in the tree were removed later (see 2026-11-21 hygiene commit).
+- Outcome: Fixed in 1a7d93d, taking the copy branch of the fix: `frontend/index.html` now states it is not the real frontend, points at `backend/static/`, and links the live site, so no `frontend/AGENTS.md` is needed while the folder stays a placeholder. All three `static/` `.DS_Store` files are gone; four unrelated ones elsewhere (`docs/`, `src/`, `src/games/`, `src/games/chess/`) were trashed in the 2026-11-21 hygiene pass — untracked and gitignored, so no commit was involved.
 
 ## [FE-013] Rainbow animations run forever offscreen
 

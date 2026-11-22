@@ -9,7 +9,7 @@
 
 import { createServer } from "node:http";
 import { readFile, stat } from "node:fs/promises";
-import { extname, join, normalize, sep } from "node:path";
+import { basename, extname, join, normalize, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = fileURLToPath(new URL("../static/", import.meta.url));
@@ -43,14 +43,27 @@ const server = createServer(async (req, res) => {
       return;
     }
 
-    const info = await stat(target);
+    // Mirror src/api/html.rs::resolve_content: for CSS under static/, serve
+    // static/dist/<name> when it exists (that is what the image ships) and fall
+    // back to source. Without this, a page linking tailwind.css 404s here even
+    // though the Rust server would serve it.
+    let file = target;
+    if (pathname.endsWith(".css")) {
+      const fromDist = join(ROOT, "dist", basename(target));
+      const distOk = await stat(fromDist)
+        .then((s) => s.isFile())
+        .catch(() => false);
+      if (distOk) file = fromDist;
+    }
+
+    const info = await stat(file);
     if (info.isDirectory()) {
       res.writeHead(301, { location: `${pathname}/` });
       res.end();
       return;
     }
 
-    const body = await readFile(target);
+    const body = await readFile(file);
     res.writeHead(200, {
       "content-type": CONTENT_TYPES[extname(target)] ?? "application/octet-stream",
       "content-length": body.length,

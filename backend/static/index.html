@@ -51,6 +51,7 @@
     <link rel="icon" type="image/svg+xml" href="/static/assets/favicon.svg" />
     <link rel="alternate icon" href="/static/assets/favicon.ico" />
 
+    <link rel="stylesheet" href="tailwind.css" />
     <link rel="stylesheet" href="common.css" />
     <link rel="stylesheet" href="style.css" />
 
@@ -95,7 +96,7 @@
       </nav>
     </header>
     <main>
-      <section id="name-section">
+      <section id="name-section" class="w-full min-h-[100dvh] flex flex-row justify-center items-stretch">
         <h1>
           Hi, i'm
           <span id="name-span">Mon</span>buticloud
@@ -155,8 +156,8 @@
           </div>
         </div>
       </section>
-      <section id="skills">
-        <h2>Skills</h2>
+      <section id="skills" class="w-full max-w-[1100px] mx-auto py-12 px-6">
+        <h2 class="text-[2em] font-bold text-center mb-4">Skills</h2>
 
         <div class="skills-legend glass">
           <div class="legend-section">
@@ -173,13 +174,13 @@
             <div class="legend-row">
               <div class="comfort-row">
                 <div class="comfort-bar">
-                  <div class="comfort-fill w-100"></div>
+                  <div class="comfort-fill w-[100%]"></div>
                 </div>
                 <span class="comfort-label">Very Comfortable</span>
               </div>
               <div class="comfort-row">
                 <div class="comfort-bar">
-                  <div class="comfort-fill w-20"></div>
+                  <div class="comfort-fill w-[20%]"></div>
                 </div>
                 <span class="comfort-label">Not Comfortable</span>
               </div>
@@ -191,9 +192,9 @@
           </p>
         </div>
 
-        <article class="skill-category">
-          <h3>Languages</h3>
-          <ul class="skill-grid">
+        <article class="mb-10">
+          <h3 class="text-[1.3em] font-medium text-rosy-taupe-700 mb-[0.8em] pl-[0.3em] border-l-[3px] border-l-lime-cream-500">Languages</h3>
+          <ul class="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3 list-none m-0 p-0">
             <li class="skill-card tilt">
               <div class="skill-card-head">
                 <span class="skill-name">Rust</span>
@@ -201,7 +202,7 @@
               </div>
               <div class="comfort-row">
                 <div class="comfort-bar">
-                  <div class="comfort-fill w-100"></div>
+                  <div class="comfort-fill w-[100%]"></div>
                 </div>
                 <span class="comfort-label">Very Comfortable</span>
               </div>
@@ -213,7 +214,7 @@
               </div>
               <div class="comfort-row">
                 <div class="comfort-bar">
-                  <div class="comfort-fill w-80"></div>
+                  <div class="comfort-fill w-[80%]"></div>
                 </div>
                 <span class="comfort-label">Comfortable</span>
               </div>
@@ -225,7 +226,7 @@
               </div>
               <div class="comfort-row">
                 <div class="comfort-bar">
-                  <div class="comfort-fill w-60"></div>
+                  <div class="comfort-fill w-[60%]"></div>
                 </div>
                 <span class="comfort-label">Somewhat Comfortable</span>
               </div>
@@ -237,7 +238,7 @@
               </div>
               <div class="comfort-row">
                 <div class="comfort-bar">
-                  <div class="comfort-fill w-40"></div>
+                  <div class="comfort-fill w-[40%]"></div>
                 </div>
                 <span class="comfort-label">Somewhat</span>
               </div>
@@ -249,7 +250,7 @@
               </div>
               <div class="comfort-row">
                 <div class="comfort-bar">
-                  <div class="comfort-fill w-20"></div>
+                  <div class="comfort-fill w-[20%]"></div>
                 </div>
                 <span class="comfort-label">Not Comfortable</span>
               </div>
@@ -261,7 +262,7 @@
               </div>
               <div class="comfort-row">
                 <div class="comfort-bar">
-                  <div class="comfort-fill w-20"></div>
+                  <div class="comfort-fill w-[20%]"></div>
                 </div>
                 <span class="comfort-label">Not Comfortable</span>
               </div>
@@ -269,9 +270,9 @@
           </ul>
         </article>
 
-        <article class="skill-category">
-          <h3>Tools</h3>
-          <ul class="skill-grid">
+        <article class="mb-10">
+          <h3 class="text-[1.3em] font-medium text-rosy-taupe-700 mb-[0.8em] pl-[0.3em] border-l-[3px] border-l-lime-cream-500">Tools</h3>
+          <ul class="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3 list-none m-0 p-0">
             <li class="skill-card tilt">
               <div class="skill-card-head">
                 <span class="skill-name">Git</span>
@@ -279,7 +280,7 @@
               </div>
               <div class="comfort-row">
                 <div class="comfort-bar">
-                  <div class="comfort-fill w-100"></div>
+                  <div class="comfort-fill w-[100%]"></div>
                 </div>
                 <span class="comfort-label">Very Comfortable</span>
               </div>
@@ -291,7 +292,7 @@
               </div>
               <div class="comfort-row">
                 <div class="comfort-bar">
-                  <div class="comfort-fill w-100"></div>
+                  <div class="comfort-fill w-[100%]"></div>
                 </div>
                 <span class="comfort-label">Very Comfortable</span>
               </div>
@@ -303,7 +304,7 @@
               </div>
               <div class="comfort-row">
                 <div class="comfort-bar">
-                  <div class="comfort-fill w-80"></div>
+                  <div class="comfort-fill w-[80%]"></div>
                 </div>
                 <span class="comfort-label">Comfortable</span>
               </div>
@@ -315,7 +316,7 @@
               </div>
               <div class="comfort-row">
                 <div class="comfort-bar">
-                  <div class="comfort-fill w-80"></div>
+                  <div class="comfort-fill w-[80%]"></div>
                 </div>
                 <span class="comfort-label">Comfortable</span>
               </div>
@@ -327,7 +328,7 @@
               </div>
               <div class="comfort-row">
                 <div class="comfort-bar">
-                  <div class="comfort-fill w-40"></div>
+                  <div class="comfort-fill w-[40%]"></div>
                 </div>
                 <span class="comfort-label">Somewhat</span>
               </div>
@@ -335,9 +336,9 @@
           </ul>
         </article>
 
-        <article class="skill-category">
-          <h3>Programming Concepts</h3>
-          <ul class="skill-grid">
+        <article class="mb-10">
+          <h3 class="text-[1.3em] font-medium text-rosy-taupe-700 mb-[0.8em] pl-[0.3em] border-l-[3px] border-l-lime-cream-500">Programming Concepts</h3>
+          <ul class="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3 list-none m-0 p-0">
             <li class="skill-card tilt">
               <div class="skill-card-head">
                 <span class="skill-name">Type-Driven Design</span>
@@ -345,7 +346,7 @@
               </div>
               <div class="comfort-row">
                 <div class="comfort-bar">
-                  <div class="comfort-fill w-100"></div>
+                  <div class="comfort-fill w-[100%]"></div>
                 </div>
                 <span class="comfort-label">Very Comfortable</span>
               </div>
@@ -357,7 +358,7 @@
               </div>
               <div class="comfort-row">
                 <div class="comfort-bar">
-                  <div class="comfort-fill w-80"></div>
+                  <div class="comfort-fill w-[80%]"></div>
                 </div>
                 <span class="comfort-label">Comfortable</span>
               </div>
@@ -369,7 +370,7 @@
               </div>
               <div class="comfort-row">
                 <div class="comfort-bar">
-                  <div class="comfort-fill w-80"></div>
+                  <div class="comfort-fill w-[80%]"></div>
                 </div>
                 <span class="comfort-label">Comfortable</span>
               </div>
@@ -381,7 +382,7 @@
               </div>
               <div class="comfort-row">
                 <div class="comfort-bar">
-                  <div class="comfort-fill w-80"></div>
+                  <div class="comfort-fill w-[80%]"></div>
                 </div>
                 <span class="comfort-label">Comfortable</span>
               </div>
@@ -391,7 +392,7 @@
       </section>
     </main>
 
-    <section id="grid-section">
+    <section id="grid-section" class="w-full flex justify-center py-8">
       <div id="grid-container"></div>
     </section>
 

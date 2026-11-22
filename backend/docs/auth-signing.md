@@ -405,7 +405,7 @@ A genuinely independent trust anchor for the signing tool, for example:
 - Second-channel distribution (OS package manager, app store, physical media)
 - A pinned hash obtained from infrastructure independent of the site itself
 
-Neither exists in the current deployment. Until one does, **signup MITM is unmitigated** — accepted residual risk, tracked as CR-011 in `docs/Todo/todo.md`.
+Neither exists in the current deployment. Until one does, **signup MITM is unmitigated** — accepted residual risk, tracked as issue #3.
 
 ---
 

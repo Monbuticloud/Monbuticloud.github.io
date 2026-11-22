@@ -29,7 +29,6 @@ Rust HTTP server serving portfolio pages, a Lazy SMP chess engine, and FALCON po
 | `docs/` | Docs | Auth protocol spec (`auth-signing.md`) |
 | `docs/specs/` | Docs | Feature design specs (SDD design docs) |
 | `docs/plans/` | Docs | Implementation plans (SDD task briefs) |
-| `docs/Todo/` | Docs | Todo tracking system (Guide.md rules; todo.md open, complete.md done) |
 | `scripts/` | Tooling | `bench-alloc.sh` (orchestrator, `--compare` builds mimalloc + jemalloc variants), `bench-alloc.py` (HTTP latency sampling), `bench-alloc.Dockerfile` (A/B variant builder); `svg-split.py` / `svg-to-symbols.py` (SVG asset prep) |
 
 ## Local Contracts
@@ -46,7 +45,8 @@ Rust HTTP server serving portfolio pages, a Lazy SMP chess engine, and FALCON po
 ## Work Guidance
 
 - FALCON verify is wired via `falcon-rs` — FN-DSA-1024 public keys only. `authorize` verifies the signature over the nonce before issuing a session; registration rejects non-1024-param keys.
-- Known residual risk: signup MITM is unmitigated (no out-of-band trust anchor for the signing tool) — see CR-011 in `docs/Todo/todo.md` and the corrected threat model in `docs/auth-signing.md`.
+- Work is tracked in GitHub Issues, not markdown. The old `docs/Todo/` files were migrated in full (issues #1–#27), so open an issue for every new finding instead of adding a file. `p:N` / `b:N` labels carry the old P and B scores; area labels (`auth`, `chess`, `frontend`, `infra`, `ci`, `docs`, `hygiene`) replace the old file grouping.
+- Known residual risk: signup MITM is unmitigated (no out-of-band trust anchor for the signing tool) — see issue #3 and the corrected threat model in `docs/auth-signing.md`.
 - `AUTH_HMAC_SECRET` is required (base64, at least 24 bytes). Server panics if unset.
 - `build.rs` links Homebrew `libpq` on macOS — no env vars needed for local builds.
 - Tests live in `src/tests/` as a mirror of `src/` (e.g. `src/tests/games/chess/main.rs`), wired via `#[path]`.
@@ -77,7 +77,7 @@ Rust HTTP server serving portfolio pages, a Lazy SMP chess engine, and FALCON po
 
 ## Child DOX Index
 
-- `docs/Todo/AGENTS.md` — file-based todo tracking system (Guide.md, todo.md, complete.md)
+No child docs yet.
 
 Candidates:
 - `crates/falcon-wasm/AGENTS.md` — for the WASM crate build pipeline

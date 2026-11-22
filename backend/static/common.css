@@ -119,31 +119,39 @@
   --body-bg: var(--frosted-mint-500);
 }
 
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-  font-family: Helvetica, Arial, sans-serif, "Times New Roman", Times, serif;
-}
+/* FE-006b: the reset and body/theme globals live in the `base` layer (ordered
+ * before `components` and `utilities` in tailwind.input.css) so Tailwind
+ * utilities can override them. Left unlayered they would win every conflict.
+ * Everything below this block stays unlayered: those rules are components, and
+ * an unlayered rule still outranks any layered one, which is what keeps the
+ * existing pages pixel-identical. */
+@layer base {
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: Helvetica, Arial, sans-serif, "Times New Roman", Times, serif;
+  }
 
-html,
-body {
-  height: 100%;
-  overflow: auto;
-  overscroll-behavior: none;
-}
+  html,
+  body {
+    height: 100%;
+    overflow: auto;
+    overscroll-behavior: none;
+  }
 
-body {
-  color: var(--body-text);
-  background: var(--body-bg);
-  transition: background-color 0.3s ease;
-}
+  body {
+    color: var(--body-text);
+    background: var(--body-bg);
+    transition: background-color 0.3s ease;
+  }
 
-html[data-theme-mode="Dark"] {
-  --body-text: var(--frosted-mint-100);
-  --body-bg: #1a1a2e;
-  --hover-brightness: 1.15;
-  --active-brightness: 1.3;
+  html[data-theme-mode="Dark"] {
+    --body-text: var(--frosted-mint-100);
+    --body-bg: #1a1a2e;
+    --hover-brightness: 1.15;
+    --active-brightness: 1.3;
+  }
 }
 
 section {

@@ -54,6 +54,7 @@
     <link rel="icon" type="image/svg+xml" href="/static/assets/favicon.svg" />
     <link rel="alternate icon" href="/static/assets/favicon.ico" />
 
+    <link rel="stylesheet" href="tailwind.css" />
     <link rel="stylesheet" href="common.css" />
     <link rel="stylesheet" href="contact.css" />
   </head>
@@ -80,17 +81,17 @@
     </header>
 
     <main>
-      <section id="contact">
-        <h2>Get in Touch</h2>
-        <p class="contact-subtitle">
+      <section id="contact" class="w-full max-w-[700px] mx-auto pt-24 px-6 pb-12">
+        <h2 class="text-[2em] font-bold text-center mb-8">Get in Touch</h2>
+        <p class="text-center text-rosy-taupe-700 mb-8">
           Have a question, project idea, or just want to say hi? I'd love to
           hear from you.
         </p>
 
-        <div class="contact-list">
-          <div class="contact-card">
-            <div class="contact-card-head">
-              <span class="contact-card-name"
+        <div class="grid grid-cols-1 gap-4">
+          <div class="contact-card p-6 text-center">
+            <div class="flex items-center justify-center gap-2 mb-2">
+              <span class="font-bold text-[1em] text-wine-plum-500"
                 ><svg class="fa-icon" aria-hidden="true"><use href="/static/assets/icons.svg#github"/></svg>
                 GitHub</span
               >
@@ -99,20 +100,20 @@
               href="https://github.com/monbuticloud"
               target="_blank"
               rel="noopener noreferrer"
-              class="contact-link"
+              class="text-[0.9em] text-berry-blush-500 no-underline mt-[0.5em] inline-block hover:underline"
             >
               github.com/monbuticloud
             </a>
           </div>
 
-          <div class="contact-card">
-            <div class="contact-card-head">
-              <span class="contact-card-name"
+          <div class="contact-card p-6 text-center">
+            <div class="flex items-center justify-center gap-2 mb-2">
+              <span class="font-bold text-[1em] text-wine-plum-500"
                 ><svg class="fa-icon" aria-hidden="true"><use href="/static/assets/icons.svg#envelope"/></svg>
                 Email</span
               >
             </div>
-            <a href="mailto:Hoangquocanhmon@icloud.com" class="contact-link">
+            <a href="mailto:Hoangquocanhmon@icloud.com" class="text-[0.9em] text-berry-blush-500 no-underline mt-[0.5em] inline-block hover:underline">
               Hoangquocanhmon@icloud.com
             </a>
           </div>

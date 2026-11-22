@@ -18,7 +18,11 @@
  * Usage: `@import "tailwindcss"` is intentionally absent — add utilities in
  * markup and let `@source` below find them.
  */
-@layer theme, components, utilities;
+/* `base` sits below `components` and `utilities` so a utility can override the
+ * reset in common.css. Without a layer, that reset would beat every utility:
+ * unlayered declarations win over layered ones regardless of specificity, so
+ * `* { padding: 0 }` would silently defeat `pt-24`. */
+@layer theme, base, components, utilities;
 
 @import "tailwindcss/theme.css" layer(theme);
 @import "tailwindcss/utilities.css" layer(utilities);

@@ -45,7 +45,7 @@ Rust HTTP server serving portfolio pages, a Lazy SMP chess engine, and FALCON po
 ## Work Guidance
 
 - FALCON verify is wired via `falcon-rs` — FN-DSA-1024 public keys only. `authorize` verifies the signature over the nonce before issuing a session; registration rejects non-1024-param keys.
-- Work is tracked in GitHub Issues, not markdown. The old `docs/Todo/` files were migrated in full (issues #1–#27), so open an issue for every new finding instead of adding a file. `p:N` / `b:N` labels carry the old P and B scores; area labels (`auth`, `chess`, `frontend`, `infra`, `ci`, `docs`, `hygiene`) replace the old file grouping.
+- Work is tracked in GitHub Issues, not markdown. The `docs/Todo/` files were migrated in full (issues #1–#27), so open an issue for every new finding instead of adding a file. Every issue carries `p:N` / `b:N` labels for its priority and breaking score, plus area labels (`auth`, `chess`, `frontend`, `infra`, `ci`, `docs`, `hygiene`). Only score values already in use have labels, so `gh label create p:1` before scoring a new value — `gh issue create --label` fails on a label that does not exist.
 - Known residual risk: signup MITM is unmitigated (no out-of-band trust anchor for the signing tool) — see issue #3 and the corrected threat model in `docs/auth-signing.md`.
 - `AUTH_HMAC_SECRET` is required (base64, at least 24 bytes). Server panics if unset.
 - `build.rs` links Homebrew `libpq` on macOS — no env vars needed for local builds.

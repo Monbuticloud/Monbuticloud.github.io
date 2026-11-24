@@ -10,23 +10,24 @@ backend/nginx/certs/
 backend/data/
 
 # Environment / Secrets
-backend/.env
+backend/app/.env
 
 # Temp files
 .tmp/
 temp/
 backend/.tmp/
+backend/app/.tmp/
 backend/v
 
 # FE-003: CSS tooling — dependencies and generated flattened CSS
-backend/node_modules/
-backend/static/dist/
+frontend/node_modules/
+frontend/static/dist/
 
 # FE-011: Playwright smoke-test artifacts
-backend/test-results/
-backend/playwright-report/
-backend/blob-report/
-backend/.playwright/
+frontend/test-results/
+frontend/playwright-report/
+frontend/blob-report/
+frontend/.playwright/
 
 # SDD worktrees
 .worktrees/

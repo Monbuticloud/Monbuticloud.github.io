@@ -15,11 +15,17 @@ Monorepo for my portfolio site and the Rust backend that serves it.
 
 ```bash
 cd backend
-echo "AUTH_HMAC_SECRET=$(openssl rand -base64 32)" > .env
+# Create .env only if it is missing, with owner-only permissions (0600).
+# The subshell keeps that umask out of the rest of the shell.
+[ -f .env ] || ( umask 077; echo "AUTH_HMAC_SECRET=$(openssl rand -base64 32)" > .env )
 docker compose up --build       # Nginx + Rust + Postgres + PgDog
 ```
 
 `AUTH_HMAC_SECRET` is required. The server asserts a decoded length of at least 24 bytes at first use, so an unset, blank, or placeholder value panics at startup. `backend/.env.example` is the reference file; its `changeme` placeholder is deliberately too short to run with.
+
+The `[ -f .env ] ||` guard is deliberate: session tokens are stateless HMACs keyed by this secret, so regenerating it invalidates every issued token. Re-running the block leaves an existing `.env` untouched. To rotate the secret on purpose, delete the file first and expect all sessions to be signed out.
+
+`umask 022` is the common default, which would create `.env` as `0644` — readable by any local account that can traverse the repository. `umask 077` narrows it to `0600`.
 
 Compose reads `.env` from `backend/`, the directory holding `docker-compose.yml`. An exported `AUTH_HMAC_SECRET` takes precedence over the file.
 

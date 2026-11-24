@@ -15,19 +15,37 @@ Monorepo for my portfolio site and the Rust backend that serves it.
 
 ```bash
 cd backend
-# Create .env only if it is missing, with owner-only permissions (0600).
-# The subshell keeps that umask out of the rest of the shell.
-[ -f .env ] || ( umask 077; echo "AUTH_HMAC_SECRET=$(openssl rand -base64 32)" > .env )
-docker compose up --build       # Nginx + Rust + Postgres + PgDog
+
+# Create .env once, owner-only (0600), and never with an empty secret.
+if [ ! -f .env ]; then
+  secret=$(openssl rand -base64 32) || secret=
+  if [ -n "$secret" ]; then
+    ( umask 077; printf 'AUTH_HMAC_SECRET=%s\n' "$secret" > .env )
+  else
+    echo "openssl missing or returned nothing — .env not written" >&2
+  fi
+  unset secret
+fi
+
+# Start only if a usable secret exists, in the file or the environment.
+if grep -qE '^AUTH_HMAC_SECRET=.+' .env 2>/dev/null || [ -n "${AUTH_HMAC_SECRET:-}" ]; then
+  docker compose up --build     # Nginx + Rust + Postgres + PgDog
+else
+  echo "no usable AUTH_HMAC_SECRET — fix .env or export one, then re-run" >&2
+fi
 ```
 
 `AUTH_HMAC_SECRET` is required. The server asserts a decoded length of at least 24 bytes at first use, so an unset, blank, or placeholder value panics at startup. `backend/.env.example` is the reference file; its `changeme` placeholder is deliberately too short to run with.
 
-The `[ -f .env ] ||` guard is deliberate: session tokens are stateless HMACs keyed by this secret, so regenerating it invalidates every issued token. Re-running the block leaves an existing `.env` untouched. To rotate the secret on purpose, delete the file first and expect all sessions to be signed out.
+Three properties of that block are load-bearing:
 
-`umask 022` is the common default, which would create `.env` as `0644` — readable by any local account that can traverse the repository. `umask 077` narrows it to `0600`.
+- **It never writes an empty secret.** `echo "…=$(openssl …)" > .env` exits `0` even when `openssl` is absent, leaving `AUTH_HMAC_SECRET=` in the file; the presence guard then preserves that broken file on every later run. Here the generator's status is checked and the file is not created on failure.
+- **It does not regenerate an existing secret.** Session tokens are stateless HMACs keyed by this value, so a new secret signs everyone out. Re-running the block leaves an existing `.env` untouched.
+- **It uses owner-only permissions.** `umask 022` is the common default and would create `.env` as `0644`, readable by any local account that can traverse the repository. `umask 077` in a subshell narrows it to `0600` without changing the shell you paste into.
 
-Compose reads `.env` from `backend/`, the directory holding `docker-compose.yml`. An exported `AUTH_HMAC_SECRET` takes precedence over the file.
+To rotate the secret, unset any exported `AUTH_HMAC_SECRET`, delete `.env`, and re-run the block — then expect every session to be signed out. Unsetting matters: an exported value takes precedence over the file, so deleting `.env` alone leaves the effective secret unchanged and old tokens still valid.
+
+Compose reads `.env` from `backend/`, the directory holding `docker-compose.yml`.
 
 Two prerequisites beyond Docker Desktop:
 

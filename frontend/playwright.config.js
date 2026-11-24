@@ -1,6 +1,6 @@
 // Playwright config for the frontend smoke tests (FE-011).
 //
-// CJS on purpose: backend/package.json has no "type": "module", so a .js config
+// CJS on purpose: frontend/package.json has no "type": "module", so a .js config
 // using `import` would not load. The static server is an .mjs for the same reason.
 const { defineConfig, devices } = require("@playwright/test");
 

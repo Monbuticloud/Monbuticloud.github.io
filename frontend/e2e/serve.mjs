@@ -1,6 +1,6 @@
 // Minimal static server for the Playwright smoke tests.
 //
-// Serves backend/static/ at the root, which mirrors how the backend exposes
+// Serves frontend/static/ at the root, which mirrors how the backend exposes
 // page assets: the HTML links bare relative URLs (./common.css, ./auth/main.js,
 // ./pages/index/index.js), so the directory has to be the web root.
 //
@@ -43,7 +43,7 @@ const server = createServer(async (req, res) => {
       return;
     }
 
-    // Mirror src/api/html.rs::resolve_content: for CSS under static/, serve
+    // Mirror backend/app/src/api/html.rs::resolve_content: for CSS under static/, serve
     // static/dist/<name> when it exists (that is what the image ships) and fall
     // back to source. Without this, a page linking tailwind.css 404s here even
     // though the Rust server would serve it.

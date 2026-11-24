@@ -39,18 +39,28 @@ Everything needed to build and run the stack around the Rust app.
 ## Work Guidance
 
 - Compose commands run from `backend/`: `docker compose up --build`, `docker compose config`.
+- Compose reads `.env` from this directory. `backend/.env` is the file; `backend/app/.env` is silently ignored because there is no `env_file` entry. Exported variables still take precedence over the file.
 - Bake runs from `backend/`: `docker buildx bake default`. The targets resolve `context = ".."` and `dockerfile = "backend/Dockerfile"` relative to the HCL file.
 - Changing a runtime path means changing three places together: the `STATIC_ROUTES` entry in `app/src/main.rs`, the `COPY` destination in `Dockerfile`, and any `alias` in `nginx/default.conf`.
 - Adding a new service config: put it in its own directory beside the service that mounts it, then update the compose volume.
 - `scripts/bench-alloc.sh` builds its A/B variants from the repo root now: `APP="$ROOT/backend/app"`, compose at `$ROOT/backend/docker-compose.yml`, context `$ROOT`.
-- `.env` is gitignored (`app/.env`). `AUTH_HMAC_SECRET` is required and compose interpolates it.
+- `.env` is gitignored and lives here, beside `docker-compose.yml`. `AUTH_HMAC_SECRET` is required: the server asserts a decoded length of at least 24 bytes at first use, so a blank value panics rather than producing forgeable tokens. Generate one with `openssl rand -base64 32`.
 
 ## Verification
 
 - `docker compose config` (in `backend/`) — validates compose syntax and that both build contexts and dockerfile paths resolve
 - `docker compose up --build` (in `backend/`) — full stack build; the css-builder stage fails loudly on empty or unflattened CSS
 - `docker buildx bake --print default` (in `backend/`) — resolves the bake targets without building
-- Runtime smoke: `curl -sI http://localhost/`, `/style.css`, `/static/assets/favicon.svg`, `/falcon_wasm_bg.wasm` — all must be 200, not 404
+- Runtime smoke, over TLS. The `:80` listener answers every path with `301`, so an HTTP check cannot tell a served asset from a missing one and will never show `200`:
+
+  ```bash
+  for p in / /style.css /static/assets/favicon.svg /falcon_wasm_bg.wasm; do
+    curl -ks -o /dev/null -w "%{http_code}  $p\n" "https://localhost$p"
+  done
+  ```
+
+  All four must be `200`. The redirect is a separate check: `curl -sI http://localhost/ | head -1` (expect `301`).
+- TLS needs local certs. `nginx/certs/` is gitignored, so a fresh clone has no `selfsigned.crt` / `selfsigned.key` and the nginx image build fails until they exist. Generate them first.
 
 ## Child DOX Index
 

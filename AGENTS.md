@@ -118,8 +118,9 @@ Monorepo for Monbuticloud's personal portfolio site and projects.
 5. **Backend**: `docker compose up --build` from `backend/`. Depends on Docker Desktop, `docker login dhi.io` (free, for the hardened Postgres image), `wasm-bindgen` + `wasm-opt` for falcon-wasm.
 6. **Frontend**: `npm ci` in `frontend/`. `frontend/static/dist/` is generated and gitignored.
 7. **Pages**: `github-pages/index.html` is the only tracked Pages file. CI uploads that directory, nothing else.
-8. **Auth**: FALCON (FN-DSA-1024) signatures verified server-side via `falcon-rs`; registration restricted to 1024-param pub keys. Private key generated client-side, never uploaded. HMAC stateless sessions with nonce_counter revocation.
-9. **Chess**: Depth 1–15; depth 13–15 require a Bearer session with CAP_DEEP_SEARCH (enforced server-side). Lazy SMP via `rayon::scope`. Semaphore backpressure → 503.
+8. **`backend/.env` is the only env file Compose reads.** It reads `.env` from the Compose project directory; it does not read `backend/app/.env`, and the compose file has no `env_file` entry. `AUTH_HMAC_SECRET` is required and the server panics without it.
+9. **Auth**: FALCON (FN-DSA-1024) signatures verified server-side via `falcon-rs`; registration restricted to 1024-param pub keys. Private key generated client-side, never uploaded. HMAC stateless sessions with nonce_counter revocation.
+10. **Chess**: Depth 1–15; depth 13–15 require a Bearer session with CAP_DEEP_SEARCH (enforced server-side). Lazy SMP via `rayon::scope`. Semaphore backpressure → 503.
 
 ## Work Guidance
 
@@ -127,14 +128,14 @@ Monorepo for Monbuticloud's personal portfolio site and projects.
 - Issue titles are `[TYPE]: short description` using conventional-commit types. Issues #1–#26 keep their legacy `[CR-###]` / `[FE-###]` titles because old commit messages name those IDs; leave them alone.
 - Keep session tokens stateless (HMAC, no session table)
 - FALCON verify is wired via `falcon-rs` — FN-DSA-1024 public keys only
-- `.env` files are gitignored; `backend/app/.env.example` is the template
+- `.env` files are gitignored; `backend/.env.example` is the template. Copy it to `backend/.env` — Compose reads `.env` from the directory holding `docker-compose.yml`, so a file anywhere else is silently ignored
 - PgDog is the pooler — no client-side connection pool
 - When adding a file, put it in the tree that matches its purpose, not the tree that happens to be nearest. A page asset goes in `frontend/static/`; a Rust module in `backend/app/src/`; an infra config beside the service that reads it; a durable doc in `docs/`.
 - `docs/plans/` and `docs/specs/` are dated implementation records pinned to the commit that shipped them. Their internal paths predate the `backend/app/` move; do not rewrite them, and do not treat them as current instructions.
 
 ## Verification
 
-- `cargo check` — type checks the Rust app (run in `backend/app/`)
+- `cargo check --all-targets` — type checks the Rust app (run in `backend/app/`)
 - `cargo test` — runs Rust tests
 - `cargo clippy` — lints
 - `cargo deny check` — dependency audit (config at `backend/app/deny.toml`, cargo-deny 0.19 schema)
@@ -143,6 +144,7 @@ Monorepo for Monbuticloud's personal portfolio site and projects.
 - `npm run lint` (in `frontend/`) — stylelint + HTMLHint
 - `npm run test:e2e` (in `frontend/`) — Playwright page smoke suite
 - `docker compose config` (in `backend/`) — validates the compose file and its build contexts
+- `cargo check` in `backend/app/crates/falcon-wasm/` — a separate package, not a member of the app crate, so the app's checks do not cover it
 - `wasm-opt` + `wasm-bindgen` for falcon-wasm builds (`backend/app/crates/falcon-wasm/build.sh`)
 
 ## Child DOX Index

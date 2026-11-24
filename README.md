@@ -15,10 +15,18 @@ Monorepo for my portfolio site and the Rust backend that serves it.
 
 ```bash
 cd backend
-docker compose up --build        # Nginx + Rust + Postgres + PgDog
+echo "AUTH_HMAC_SECRET=$(openssl rand -base64 32)" > .env
+docker compose up --build       # Nginx + Rust + Postgres + PgDog
 ```
 
-Needs Docker Desktop and `docker login dhi.io` (free) for the hardened Postgres image.
+`AUTH_HMAC_SECRET` is required. The server asserts a decoded length of at least 24 bytes at first use, so an unset, blank, or placeholder value panics at startup. `backend/.env.example` is the reference file; its `changeme` placeholder is deliberately too short to run with.
+
+Compose reads `.env` from `backend/`, the directory holding `docker-compose.yml`. An exported `AUTH_HMAC_SECRET` takes precedence over the file.
+
+Two prerequisites beyond Docker Desktop:
+
+- `docker login dhi.io` (free) pulls the hardened Postgres image.
+- `backend/nginx/certs/selfsigned.crt` and `selfsigned.key` are gitignored, so generate local self-signed certs before the first build or the nginx image fails.
 
 ## Run the server without Docker
 
@@ -30,8 +38,18 @@ AUTH_HMAC_SECRET="$(head -c 48 /dev/urandom | base64)" \
 
 ## Checks
 
+Each block runs from the repository root.
+
 ```bash
-cd backend/app && cargo check && cargo test && cargo clippy   # Rust
-cd frontend   && npm ci && npm run lint && npm run test:e2e   # pages
-cd backend    && docker compose config                        # stack wiring
+# Rust — type check, tests, lint
+(cd backend/app && cargo check --all-targets && cargo test && cargo clippy --all-targets)
+
+# WASM crate — a separate package, not covered by the app's checks
+(cd backend/app/crates/falcon-wasm && cargo check)
+
+# Pages — install, lint, browser smoke test
+(cd frontend && npm ci && npm run lint && npm run test:e2e)
+
+# Stack wiring — resolves both build contexts without building
+(cd backend && docker compose config)
 ```

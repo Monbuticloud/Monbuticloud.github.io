@@ -5,7 +5,9 @@
 
 ## Purpose
 
-Rust HTTP server serving portfolio pages, a Lazy SMP chess engine, and FALCON post-quantum auth. A Cargo workspace: this crate at its root, `crates/falcon-wasm/` as a child member.
+Rust HTTP server serving portfolio pages, a Lazy SMP chess engine, and FALCON post-quantum auth.
+
+Two independent Cargo packages, not a workspace. This manifest has no `[workspace]` section and `crates/falcon-wasm/` is not a member, so `cargo check` here covers this crate only; WASM changes need their own check (see Verification). For the same reason `--workspace` selects nothing extra and is not used in these commands.
 
 ## Ownership
 
@@ -22,7 +24,7 @@ Rust HTTP server serving portfolio pages, a Lazy SMP chess engine, and FALCON po
 | `crates/falcon-wasm/` | WASM | FN-DSA FIPS 206 compiled to `wasm32-unknown-unknown`; `pkg/` is a tracked build artifact |
 | `scripts/` | Tooling | `bench-alloc.sh` / `.py` (allocator A/B latency harness), `bench-alloc.Dockerfile` (variant builder), `svg-split.py` / `svg-to-symbols.py` (asset prep) |
 | `Cargo.toml`, `Cargo.lock`, `rustfmt.toml`, `clippy.toml`, `deny.toml`, `.config/` | Build | Workspace manifest and Rust tooling config |
-| `.env.example` | Config | Template for `app/.env` (gitignored) |
+| `.env.example` | Config | Template for `backend/.env` (gitignored) — the file Compose reads |
 
 Repo-root files that apply here: `.cargo/config.toml` (platform linker flags) and `rust-toolchain.toml` (pinned channel + targets). They sit at the repo root so `cargo`/`rustup` discover them from any working directory.
 
@@ -53,15 +55,16 @@ Repo-root files that apply here: `.cargo/config.toml` (platform linker flags) an
 - The auth tool loads the wasm-bindgen bundle from `/falcon_wasm.js` + `/falcon_wasm_bg.wasm` (`STATIC_ROUTES` → `backend/app/crates/falcon-wasm/pkg/`; `serve_static` is binary-safe). The Dockerfile copies `pkg/` into the image — rebuild it when the crate changes.
 - Session token format: `key_id ‖ salt ‖ HMAC(secret, key_id ‖ salt ‖ nonce_counter ‖ expiry)`.
 - Challenge-nonce replay store (`USED_NONCES`) is process-local memory — single-instance only. Do not scale to multiple replicas without a shared store (see CR-003 note in `src/auth/session.rs`).
-- `.env` is gitignored — never commit secrets.
+- `.env` files are gitignored — never commit secrets. The one Compose reads is `backend/.env`, not one in this directory: Compose looks in the directory holding `docker-compose.yml`, and this manifest declares no `env_file`.
 - Page HTML/CSS/JS is **not** owned here. Pages live in `frontend/static/`; see `frontend/AGENTS.md` for the CSS cascade contract. This crate only serves them.
 - `src/api/html.rs` prefers `frontend/static/dist/<file>` over the source file for CSS and falls back for local runs without a build. `frontend/static/dist/` is generated and gitignored — never commit it.
 
 ## Verification
 
-- `cargo check` — type check (no env vars needed, `build.rs` handles libpq)
+- `cargo check --all-targets` — type check of this package (no env vars needed, `build.rs` handles libpq)
 - `cargo test` — unit + integration tests
-- `cargo clippy` — lint
+- `cargo clippy --all-targets` — lint
+- `cargo check` (in `crates/falcon-wasm/`) — the WASM crate is a separate package, so nothing above covers it
 - `cargo nextest run` — faster parallel test runner (config at `.config/nextest.toml`)
 - `cargo deny check` — dependency audit (config at `deny.toml`, cargo-deny 0.19 schema)
 - `/health` returns `ok`; `/`, `/style.css`, `/static/assets/favicon.svg`, `/falcon_wasm_bg.wasm` must all return 200 from a repo-root run

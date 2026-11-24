@@ -10,7 +10,7 @@ backend/nginx/certs/
 backend/data/
 
 # Environment / Secrets
-backend/app/.env
+backend/.env
 
 # Temp files
 .tmp/

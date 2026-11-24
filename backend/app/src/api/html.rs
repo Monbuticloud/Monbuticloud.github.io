@@ -1,6 +1,6 @@
 // ── Static file serving (runtime cache — nginx shadows /static/assets in prod) ──
 // FE-003: CSS files are flattened at Docker image-time via postcss-preset-env
-// (static/*.css → static/dist/*.css). The runtime image ships only the
+// (frontend/static/*.css → frontend/static/dist/*.css). The runtime image ships only the
 // flattened dist; a local `cargo run` without a build falls back to the
 // nested source. Source files remain the authors' input.
 
@@ -13,7 +13,7 @@ use std::sync::{LazyLock, RwLock};
 
 // Contents are cached as `Bytes` because static routes also serve binary
 // payloads (the FALCON WASM bundle) — `String` would fail UTF-8 decoding.
-/// Cache key: request path plus whether the bytes came from `static/dist`.
+/// Cache key: request path plus whether the bytes came from `frontend/static/dist`.
 /// Including the origin keeps a flattened response from sharing a slot with
 /// a source fallback (or vice versa).
 type CacheKey = (&'static str, bool);
@@ -37,15 +37,15 @@ fn mime_for_path(path: &str) -> &'static str {
     }
 }
 
-/// Resolve the preferred file to serve. For CSS, prefer `static/dist/<file>`
+/// Resolve the preferred file to serve. For CSS, prefer `frontend/static/dist/<file>`
 /// (flattened by postcss at `docker build`) when it exists on disk; otherwise
 /// fall back to the source path for local development. Non-CSS paths pass
 /// through unchanged. Returns `(status, content, from_dist)`.
 async fn resolve_content(path: &'static str) -> (StatusCode, Bytes, bool) {
     // FE-003: Prefer dist for CSS.
-    if path.ends_with(".css") && path.starts_with("static/") {
+    if path.ends_with(".css") && path.starts_with("frontend/static/") {
         let basename = path.rsplit('/').next().unwrap_or(path);
-        let dist_path = format!("static/dist/{basename}");
+        let dist_path = format!("frontend/static/dist/{basename}");
         if let Ok(c) = tokio::fs::read(&dist_path).await {
             return (StatusCode::OK, Bytes::from(c), true);
         }
@@ -115,13 +115,13 @@ mod tests {
 
     #[test]
     fn text_assets_keep_their_types() {
-        assert_eq!(mime_for_path("static/auth.html"), "text/html; charset=utf-8");
-        assert_eq!(mime_for_path("static/style.css"), "text/css; charset=utf-8");
+        assert_eq!(mime_for_path("frontend/static/auth.html"), "text/html; charset=utf-8");
+        assert_eq!(mime_for_path("frontend/static/style.css"), "text/css; charset=utf-8");
         assert_eq!(
-            mime_for_path("static/auth.js"),
+            mime_for_path("frontend/static/auth.js"),
             "application/javascript; charset=utf-8"
         );
-        assert_eq!(mime_for_path("static/robots.txt"), "text/plain");
+        assert_eq!(mime_for_path("frontend/static/robots.txt"), "text/plain");
     }
 
     /// The auth tool imports the wasm-bindgen glue, which then fetches the

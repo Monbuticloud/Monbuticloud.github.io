@@ -34,10 +34,11 @@ set -euo pipefail
 #   --compare          build + bench both allocators
 #   -h, --help         this help
 
-ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-BACKEND="$ROOT/backend"
-PY="$BACKEND/scripts/bench-alloc.py"
-OUTDIR="$BACKEND/.tmp/bench-alloc"
+ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
+APP="$ROOT/backend/app"
+COMPOSE="$ROOT/backend/docker-compose.yml"
+PY="$APP/scripts/bench-alloc.py"
+OUTDIR="$APP/.tmp/bench-alloc"
 
 URL="http://127.0.0.1:8000/"
 CONCURRENCY=500
@@ -147,7 +148,7 @@ bench_running() {
 # ── single-variant mode: bench whatever is already up ─────────────────
 
 if [[ $COMPARE -eq 0 ]]; then
-  CID=$(docker compose -f "$BACKEND/docker-compose.yml" ps -q app 2>/dev/null | head -n1 || true)
+  CID=$(docker compose -f "$COMPOSE" ps -q app 2>/dev/null | head -n1 || true)
   if [[ -n "$CID" ]]; then
     wait_health "$URL" || true
     bench_running "mimalloc" "$URL" "$CID"
@@ -169,10 +170,10 @@ build_variant() {
   local alloc="$1" tag="backend-bench-$alloc"
   echo "# -> $tag"
   docker build \
-    -f "$BACKEND/scripts/bench-alloc.Dockerfile" \
+    -f "$APP/scripts/bench-alloc.Dockerfile" \
     --build-arg "ALLOC=$alloc" \
     -t "$tag" \
-    -q "$BACKEND"
+    -q "$ROOT"
 }
 
 build_variant mimalloc

@@ -2,8 +2,10 @@
 # ARG selects the allocator at compile time; everything else mirrors Dockerfile
 # (musl target, same profile) so the A/B measures the artifact you actually ship.
 #
-#   docker build -f scripts/bench-alloc.Dockerfile --build-arg ALLOC=mimalloc -t backend-bench-mimalloc .
-#   docker build -f scripts/bench-alloc.Dockerfile --build-arg ALLOC=jemalloc -t backend-bench-jemalloc .
+#   docker build -f backend/app/scripts/bench-alloc.Dockerfile \
+#     --build-arg ALLOC=mimalloc -t backend-bench-mimalloc .   # from the repo root
+#   docker build -f backend/app/scripts/bench-alloc.Dockerfile \
+#     --build-arg ALLOC=jemalloc -t backend-bench-jemalloc .   # from the repo root
 FROM rust:alpine AS builder
 
 RUN apk add --no-cache postgresql-dev
@@ -22,14 +24,14 @@ WORKDIR /app
 # ── Allocator selection ────────────────────────────────────────────────
 # jemalloc is optional and off by default; ALLOC=jemalloc turns it on.
 # tikv-jemallocator needs a C toolchain, which rust:alpine already has.
-COPY Cargo.toml Cargo.lock* ./
+COPY backend/app/Cargo.toml backend/app/Cargo.lock* ./
 RUN if ! grep -q 'tikv-jemallocator' Cargo.toml; then \
       printf '\n[features]\njemalloc = ["tikv-jemallocator"]\n\n[dependencies.tikv-jemallocator]\nversion = "0.6"\noptional = true\n' >> Cargo.toml; \
     fi
 
-COPY src/ src/
-COPY static/ /static/
-COPY src/games/chess/filtered.bin /static/filtered.bin
+COPY backend/app/src/ src/
+COPY frontend/static/ /frontend/static/
+COPY backend/app/src/games/chess/filtered.bin /frontend/static/filtered.bin
 
 # Gate the global_allocator on the feature, so one source tree builds both.
 RUN python3 - <<'PY' || apk add --no-cache python3
@@ -59,6 +61,6 @@ RUN TARGET=$(cat /target.txt) && \
 # ── Run stage: scratch, same as production ─────────────────────────────
 FROM scratch AS runner
 COPY --from=builder /backend /backend
-COPY --from=builder /static static/
+COPY --from=builder /frontend /frontend
 EXPOSE 8000
 CMD ["/backend"]

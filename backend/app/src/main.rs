@@ -150,43 +150,43 @@ pub(crate) fn log_error(msg: LogMsg) {
 /// (WORKDIR-less scratch → CWD=/). In production nginx serves /static/assets/
 /// directly and shadows the nest_service route.
 const STATIC_ROUTES: &[(&str, &str)] = &[
-    ("/", "static/index.html"),
-    ("/index", "static/index.html"),
-    ("/index.html", "static/index.html"),
-    ("/style.css", "static/style.css"),
-    ("/contact", "static/contact.html"),
-    ("/contact.html", "static/contact.html"),
-    ("/contact.css", "static/contact.css"),
-    ("/projects", "static/projects.html"),
-    ("/projects.html", "static/projects.html"),
-    ("/projects.css", "static/projects.css"),
-    ("/common.js", "static/common.js"),
-    ("/common.css", "static/common.css"),
+    ("/", "frontend/static/index.html"),
+    ("/index", "frontend/static/index.html"),
+    ("/index.html", "frontend/static/index.html"),
+    ("/style.css", "frontend/static/style.css"),
+    ("/contact", "frontend/static/contact.html"),
+    ("/contact.html", "frontend/static/contact.html"),
+    ("/contact.css", "frontend/static/contact.css"),
+    ("/projects", "frontend/static/projects.html"),
+    ("/projects.html", "frontend/static/projects.html"),
+    ("/projects.css", "frontend/static/projects.css"),
+    ("/common.js", "frontend/static/common.js"),
+    ("/common.css", "frontend/static/common.css"),
     // FE-005: index page is a composition root; its ES modules live under
     // `static/pages/index/` and are served individually.
-    ("/pages/index/index.js", "static/pages/index/index.js"),
-    ("/pages/index/rainbow.js", "static/pages/index/rainbow.js"),
-    ("/pages/index/terminal/intro.js", "static/pages/index/terminal/intro.js"),
-    ("/pages/index/terminal/commands.js", "static/pages/index/terminal/commands.js"),
-    ("/pages/index/terminal/input.js", "static/pages/index/terminal/input.js"),
-    ("/pages/index/grid/canvas.js", "static/pages/index/grid/canvas.js"),
+    ("/pages/index/index.js", "frontend/static/pages/index/index.js"),
+    ("/pages/index/rainbow.js", "frontend/static/pages/index/rainbow.js"),
+    ("/pages/index/terminal/intro.js", "frontend/static/pages/index/terminal/intro.js"),
+    ("/pages/index/terminal/commands.js", "frontend/static/pages/index/terminal/commands.js"),
+    ("/pages/index/terminal/input.js", "frontend/static/pages/index/terminal/input.js"),
+    ("/pages/index/grid/canvas.js", "frontend/static/pages/index/grid/canvas.js"),
     // FE-012: auth tool ES modules (composition root is `auth/main.js`).
-    ("/auth/main.js", "static/auth/main.js"),
-    ("/auth/state.js", "static/auth/state.js"),
-    ("/auth/dom.js", "static/auth/dom.js"),
-    ("/auth/base64.js", "static/auth/base64.js"),
-    ("/auth/api.js", "static/auth/api.js"),
-    ("/auth/falcon.js", "static/auth/falcon.js"),
-    ("/auth/keygen.js", "static/auth/keygen.js"),
-    ("/auth/session.js", "static/auth/session.js"),
-    ("/auth/api-panel.js", "static/auth/api-panel.js"),
+    ("/auth/main.js", "frontend/static/auth/main.js"),
+    ("/auth/state.js", "frontend/static/auth/state.js"),
+    ("/auth/dom.js", "frontend/static/auth/dom.js"),
+    ("/auth/base64.js", "frontend/static/auth/base64.js"),
+    ("/auth/api.js", "frontend/static/auth/api.js"),
+    ("/auth/falcon.js", "frontend/static/auth/falcon.js"),
+    ("/auth/keygen.js", "frontend/static/auth/keygen.js"),
+    ("/auth/session.js", "frontend/static/auth/session.js"),
+    ("/auth/api-panel.js", "frontend/static/auth/api-panel.js"),
     // FALCON WASM for the auth tool. The wasm-bindgen bundle is a tracked
     // build artifact in `crates/falcon-wasm/pkg/`, so it is routed from there
     // instead of being duplicated into `static/`.
-    ("/falcon_wasm.js", "crates/falcon-wasm/pkg/falcon_wasm.js"),
-    ("/falcon_wasm_bg.wasm", "crates/falcon-wasm/pkg/falcon_wasm_bg.wasm"),
-    ("/auth-tool.html", "static/auth.html"),
-    ("/auth-tool", "static/auth.html"),
+    ("/falcon_wasm.js", "backend/app/crates/falcon-wasm/pkg/falcon_wasm.js"),
+    ("/falcon_wasm_bg.wasm", "backend/app/crates/falcon-wasm/pkg/falcon_wasm_bg.wasm"),
+    ("/auth-tool.html", "frontend/static/auth.html"),
+    ("/auth-tool", "frontend/static/auth.html"),
 ];
 
 // ── Resource monitor (reads /proc/self/status and /proc/self/stat) ──
@@ -315,7 +315,7 @@ fn main() {
             // CWD-relative so it works in local dev (cargo run) and in the
             // container (WORKDIR-less scratch → CWD=/). In production nginx
             // serves /static/assets/ directly and shadows this route.
-            .nest_service("/static/assets", ServeDir::new("static/assets"))
+            .nest_service("/static/assets", ServeDir::new("frontend/static/assets"))
             //- chess API
             .route("/api/games/chess/completions", get(api::chess::get_chess_completion))
             //- auth API

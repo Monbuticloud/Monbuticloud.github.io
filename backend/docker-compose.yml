@@ -13,9 +13,9 @@ services:
       - "127.0.0.1:5432:5432"
     volumes:
       - ./data/postgres:/var/lib/postgresql
-      - ./config/postgres/postgresql.conf:/etc/postgresql/postgresql.conf:ro
-      - ./config/postgres/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
-      - ./config/postgres/setup.sql:/docker-entrypoint-initdb.d/00-setup.sql:ro
+      - ./postgres/postgresql.conf:/etc/postgresql/postgresql.conf:ro
+      - ./postgres/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
+      - ./postgres/setup.sql:/docker-entrypoint-initdb.d/00-setup.sql:ro
     # DHI entrypoint invokes the postgres binary itself — pass only flags.
     command: ["-c", "config_file=/etc/postgresql/postgresql.conf"]
     healthcheck:
@@ -26,9 +26,11 @@ services:
 
   nginx:
     restart: unless-stopped
+    # Context is the repo root: the image ships frontend/static/ so nginx can
+    # serve /static/assets/ and the .mhtml alias without touching the app.
     build:
-      context: .
-      dockerfile: nginx/Dockerfile.local
+      context: ..
+      dockerfile: backend/nginx/Dockerfile.local
     ports:
       - "80:80"
       - "443:443"
@@ -44,8 +46,8 @@ services:
       - "127.0.0.1:8081:8080"
       - "127.0.0.1:9631:9630"
     volumes:
-      - ./config/pgdog/pgdog.toml:/etc/pgdog/pgdog.toml:ro
-      - ./config/pgdog/users.toml:/etc/pgdog/users.toml:ro
+      - ./pgdog/pgdog.toml:/etc/pgdog/pgdog.toml:ro
+      - ./pgdog/users.toml:/etc/pgdog/users.toml:ro
     command: ["/usr/local/bin/pgdog", "--config", "/etc/pgdog/pgdog.toml", "--users", "/etc/pgdog/users.toml"]
     depends_on:
       postgres:
@@ -53,9 +55,11 @@ services:
 
   app:
     restart: unless-stopped
+    # Context is the repo root: the css-builder stage reads frontend/, the
+    # Rust stage reads backend/app/. See backend/Dockerfile.
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: backend/Dockerfile
     expose:
       - "8000"
     environment:

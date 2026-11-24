@@ -1,0 +1,41 @@
+# Build contexts are the repository root (backend/docker-compose.yml), so this
+# file must live here and not in backend/.
+
+# ── Never in a build context ──
+.git
+.github
+.gitignore
+.dockerignore
+backend/Dockerfile
+
+# ── Toolchain files the image pins for itself ──
+# .cargo/config.toml sets host linkers and rust-toolchain.toml pins a channel
+# with an apple target; neither belongs in a linux musl image build.
+.cargo
+rust-toolchain.toml
+
+# ── Rust build artifacts ──
+target
+
+# ── Tooling installed or generated locally; the image rebuilds both ──
+**/node_modules
+frontend/static/dist
+
+# ── Playwright smoke-test artifacts ──
+frontend/test-results
+frontend/playwright-report
+frontend/blob-report
+frontend/.playwright
+
+# ── Local runtime state (bind mounts, scratch) ──
+backend/data
+backend/app/.tmp
+
+# ── Not build inputs ──
+docs
+temp
+.tmp
+.superpowers
+.opencode
+.pi
+.worktrees

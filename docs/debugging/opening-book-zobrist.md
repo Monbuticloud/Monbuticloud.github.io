@@ -63,15 +63,15 @@ is an optional override that falls back to embedded.
 ## Known Good (from this debugging session)
 
 - Book is valid PolyGlot: 193072 bytes, 12067 entries, 9428 unique keys, sorted BE.
-- MD5 of the embedded book (`backend/src/games/chess/filtered.bin`):
+- MD5 of the embedded book (`backend/app/src/games/chess/filtered.bin`):
   `161deeb387f06d50aa0d2be56d65fad1`.
 - docker build on Alpine failed for `rust-openzl-sys` bindgen (dlopen on musl) — now moot
   (decompression deps removed entirely).
 
 ## Files
 
-- `backend/src/games/chess/filtered.bin` — the PolyGlot book (BE keys, sorted, embedded)
-- `backend/src/games/chess/main.rs` — `zobrist_key`, `ep_capture_possible`, `Zobrist`,
+- `backend/app/src/games/chess/filtered.bin` — the PolyGlot book (BE keys, sorted, embedded)
+- `backend/app/src/games/chess/main.rs` — `zobrist_key`, `ep_capture_possible`, `Zobrist`,
   `OpeningBook` (embedded `BOOK_BYTES`), book probe in `best_move`
-- `backend/src/tests/games/chess/main.rs` — `book_diagnostic` (16-position table),
+- `backend/app/src/tests/games/chess/main.rs` — `book_diagnostic` (16-position table),
   `incremental_hash_matches_full_hash`

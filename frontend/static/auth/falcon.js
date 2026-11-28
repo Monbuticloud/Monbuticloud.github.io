@@ -53,7 +53,7 @@ async function loadFalcon() {
         "This tool only signs with FN-DSA-1024 (FALCON-1024, 1793-byte public keys). " +
         "The server rejects non-1024 keys; no ECDSA fallback is available.\n" +
         `${reason}\n` +
-        "Rebuild with backend/crates/falcon-wasm/build.sh and serve the pkg/ files from the backend.",
+        "Rebuild with backend/app/crates/falcon-wasm/build.sh and serve the pkg/ files from the backend.",
     );
     return false;
   }
